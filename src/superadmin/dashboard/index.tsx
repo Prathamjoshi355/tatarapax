@@ -15,6 +15,7 @@ interface SuperAdminDashboardProps {
   leadsCount: number;
   mongoDbStatus: 'connected' | 'disconnected' | 'loading';
   mongoDbError: string | null;
+  onOpenGlobalAdmin?: () => void;
 }
 
 export default function SuperAdminDashboard({
@@ -26,10 +27,17 @@ export default function SuperAdminDashboard({
   onViewLiveSite,
   leadsCount,
   mongoDbStatus,
-  mongoDbError
+  mongoDbError,
+  onOpenGlobalAdmin
 }: SuperAdminDashboardProps) {
   // Determine if it looks like an IP Whitelist / SSL Alert 80 failure
-  const isWhitelistError = mongoDbError && (
+  const isAuthError = mongoDbError && (
+    mongoDbError.includes('bad auth') || 
+    mongoDbError.includes('Authentication failed') ||
+    mongoDbError.includes('auth failed')
+  );
+
+  const isWhitelistError = mongoDbError && !isAuthError && (
     mongoDbError.includes('SSL alert number 80') || 
     mongoDbError.includes('tlsv1 alert internal error') ||
     mongoDbError.includes('MongoServerSelectionError') ||
@@ -116,12 +124,22 @@ export default function SuperAdminDashboard({
               <div className="flex flex-col gap-1">
                 <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                   <span>MongoDB Atlas Connection Required</span>
-                  <span className="bg-rose-500/15 text-rose-400 text-[9px] px-2 py-0.5 rounded border border-rose-500/30 font-bold uppercase tracking-wider">
-                    Network Error (SSL 80)
-                  </span>
+                  {isAuthError ? (
+                    <span className="bg-rose-500/15 text-rose-400 text-[9px] px-2 py-0.5 rounded border border-rose-500/30 font-bold uppercase tracking-wider">
+                      Authentication Failed
+                    </span>
+                  ) : (
+                    <span className="bg-rose-500/15 text-rose-400 text-[9px] px-2 py-0.5 rounded border border-rose-500/30 font-bold uppercase tracking-wider">
+                      Network Connection Issue
+                    </span>
+                  )}
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed max-w-4xl">
-                  The application could not establish a secure handshake with your MongoDB database cluster. This is almost always caused by MongoDB Atlas dropping incoming connections from Cloud Run when the client IP is not whitelisted.
+                  {isAuthError ? (
+                    <span>The database driver reported an authentication failure. Your <strong>MONGODB_URI</strong> contains an invalid username, an incorrect password, or special characters in the password that need to be URL-encoded.</span>
+                  ) : (
+                    <span>The application could not establish a secure handshake with your MongoDB database cluster. This is typically caused by MongoDB Atlas dropping connections from Cloud Run (if the client IP is not whitelisted) or an invalid connection string.</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -134,20 +152,45 @@ export default function SuperAdminDashboard({
             )}
 
             <div className="bg-blue-950/20 border border-blue-900/40 rounded-xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-bold text-blue-300 uppercase tracking-wider">How to resolve this in 2 Steps:</span>
+              <span className="text-xs font-bold text-blue-300 uppercase tracking-wider">How to resolve this:</span>
               <ul className="text-xs text-slate-300 flex flex-col gap-2.5 list-none pl-0">
-                <li className="flex gap-2 items-start">
-                  <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
-                  <span>
-                    Log in to your <strong>MongoDB Atlas Dashboard</strong>, navigate to <strong>Network Access</strong> under Security, and click <strong>Add IP Address</strong>.
-                  </span>
-                </li>
-                <li className="flex gap-2 items-start">
-                  <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
-                  <span>
-                    Add <strong>Allow Access From Anywhere</strong> (<code className="bg-slate-900 text-amber-400 px-1.5 py-0.5 rounded font-mono font-bold">0.0.0.0/0</code>) or Whitelist the cluster IP, then wait 1 minute for MongoDB Atlas to deploy updates.
-                  </span>
-                </li>
+                {isAuthError ? (
+                  <>
+                    <li className="flex gap-2 items-start">
+                      <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <span>
+                        Go to your <strong>MongoDB Atlas Dashboard</strong>, navigate to <strong>Database Access</strong> under Security, and verify your database user's username and password. If needed, edit the user to reset the password.
+                      </span>
+                    </li>
+                    <li className="flex gap-2 items-start">
+                      <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <span>
+                        If your password contains special characters (like <code className="bg-slate-900 text-amber-400 px-1 py-0.5 rounded">@</code>, <code className="bg-slate-900 text-amber-400 px-1 py-0.5 rounded">:</code>, <code className="bg-slate-900 text-amber-400 px-1 py-0.5 rounded">/</code>, etc.), they <strong>MUST</strong> be percent-encoded (e.g. encode <code className="bg-slate-900 text-amber-400 px-1.5 py-0.5 rounded">@</code> as <code className="bg-slate-900 text-emerald-400 px-1.5 py-0.5 rounded">%40</code>).
+                      </span>
+                    </li>
+                    <li className="flex gap-2 items-start">
+                      <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <span>
+                        Open the AI Studio <strong>Settings</strong> menu (top-right gear icon), locate your <strong>MONGODB_URI</strong> variable, update it with the corrected username and password, then save the settings!
+                      </span>
+                    </li>
+                  </>
+                ) : (
+                  <>
+                    <li className="flex gap-2 items-start">
+                      <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <span>
+                        Log in to your <strong>MongoDB Atlas Dashboard</strong>, navigate to <strong>Network Access</strong> under Security, and click <strong>Add IP Address</strong>.
+                      </span>
+                    </li>
+                    <li className="flex gap-2 items-start">
+                      <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <span>
+                        Add <strong>Allow Access From Anywhere</strong> (<code className="bg-slate-900 text-amber-400 px-1.5 py-0.5 rounded font-mono font-bold">0.0.0.0/0</code>) or Whitelist the cluster IP, then wait 1 minute for MongoDB Atlas to deploy updates.
+                      </span>
+                    </li>
+                  </>
+                )}
               </ul>
               <div className="text-[10px] text-slate-400 font-medium italic mt-1 border-t border-blue-900/25 pt-2 flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 bg-blue-400 rounded-full animate-pulse" />
@@ -199,6 +242,30 @@ export default function SuperAdminDashboard({
             </div>
           </div>
 
+        </div>
+
+        {/* Global Collections CRM Banner */}
+        <div className="bg-gradient-to-r from-emerald-950/20 to-slate-900 border border-emerald-900/40 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4 text-left">
+            <div className="h-12 w-12 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Database className="h-6 w-6" />
+            </div>
+            <div className="flex flex-col">
+              <h3 className="text-base font-extrabold text-white">Global Collections CMS & CRM Hub</h3>
+              <p className="text-xs text-slate-400 mt-0.5 max-w-2xl leading-relaxed">
+                Add, edit and manage non-page datasets synced with MongoDB Atlas. This includes Placed Students CRM, Hiring Partners brand links, Course Syllabuses, Blog Articles, and Inbound Student Leads.
+              </p>
+            </div>
+          </div>
+          {onOpenGlobalAdmin && (
+            <button 
+              onClick={onOpenGlobalAdmin}
+              className="w-full md:w-auto py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg hover:shadow-emerald-500/10 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>Launch CRM Console</span>
+            </button>
+          )}
         </div>
 
         {/* Section Heading */}

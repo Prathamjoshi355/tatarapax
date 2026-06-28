@@ -26,6 +26,8 @@ interface AdminPanelProps {
   setLeads: React.Dispatch<React.SetStateAction<Lead[]>>;
   onLogout?: () => void;
   onReset?: () => void;
+  mongoDbStatus?: 'connected' | 'disconnected' | 'loading';
+  mongoDbError?: string | null;
 }
 
 export default function AdminPanel({
@@ -38,7 +40,9 @@ export default function AdminPanel({
   blogs, setBlogs,
   leads, setLeads,
   onLogout,
-  onReset
+  onReset,
+  mongoDbStatus = 'connected',
+  mongoDbError = null
 }: AdminPanelProps) {
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'pages' | 'students' | 'partners' | 'courses' | 'blogs' | 'leads' | 'media' | 'settings'>('dashboard');
@@ -133,10 +137,22 @@ export default function AdminPanel({
         <div className="mt-8 flex flex-col gap-3 font-mono">
           <div className="flex flex-col gap-2 bg-slate-950 p-3 rounded-lg border border-slate-800">
             <span className="text-[10px] text-slate-400 font-bold uppercase">MongoDB Cloud Services</span>
-            <div className="flex items-center gap-1.5 text-[9px] text-emerald-400 font-bold">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-              <span>Atlas Cluster Online</span>
-            </div>
+            {mongoDbStatus === 'connected' ? (
+              <div className="flex items-center gap-1.5 text-[9px] text-emerald-400 font-bold">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                <span>Atlas Cluster Synced</span>
+              </div>
+            ) : mongoDbStatus === 'loading' ? (
+              <div className="flex items-center gap-1.5 text-[9px] text-amber-400 font-bold">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse inline-block" />
+                <span>Connecting Atlas...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[9px] text-rose-400 font-bold">
+                <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
+                <span>Atlas Cluster Offline</span>
+              </div>
+            )}
           </div>
 
           {onReset && (

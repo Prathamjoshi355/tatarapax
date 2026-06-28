@@ -45,7 +45,14 @@ export default function App() {
   // Master persistent states loading from localStorage
   const [pages, setPages] = useState<CMSPage[]>(() => {
     const saved = localStorage.getItem('tpx_pages');
-    return saved ? JSON.parse(saved) : DEFAULT_PAGES;
+    const rawPages = saved ? JSON.parse(saved) : DEFAULT_PAGES;
+    const uniqueMap = new Map();
+    rawPages.forEach((p: CMSPage) => {
+      if (p && p.id) {
+        uniqueMap.set(p.id, p);
+      }
+    });
+    return Array.from(uniqueMap.values());
   });
 
   const [settings, setSettings] = useState<GlobalSettings>(() => {
@@ -60,33 +67,67 @@ export default function App() {
 
   const [placedStudents, setPlacedStudents] = useState<PlacedStudent[]>(() => {
     const saved = localStorage.getItem('tpx_placed_students');
-    return saved ? JSON.parse(saved) : DEFAULT_PLACED_STUDENTS;
+    const raw = saved ? JSON.parse(saved) : DEFAULT_PLACED_STUDENTS;
+    const uniqueMap = new Map();
+    raw.forEach((item: PlacedStudent) => {
+      if (item && item.id) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+    return Array.from(uniqueMap.values());
   });
 
   const [hiringPartners, setHiringPartners] = useState<HiringPartner[]>(() => {
     const saved = localStorage.getItem('tpx_hiring_partners');
-    return saved ? JSON.parse(saved) : DEFAULT_HIRING_PARTNERS;
+    const raw = saved ? JSON.parse(saved) : DEFAULT_HIRING_PARTNERS;
+    const uniqueMap = new Map();
+    raw.forEach((item: HiringPartner) => {
+      if (item && item.id) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+    return Array.from(uniqueMap.values());
   });
 
   const [courses, setCourses] = useState<Course[]>(() => {
     const saved = localStorage.getItem('tpx_courses');
-    return saved ? JSON.parse(saved) : DEFAULT_COURSES;
+    const raw = saved ? JSON.parse(saved) : DEFAULT_COURSES;
+    const uniqueMap = new Map();
+    raw.forEach((item: Course) => {
+      if (item && item.id) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+    return Array.from(uniqueMap.values());
   });
 
   const [blogs, setBlogs] = useState<BlogPost[]>(() => {
     const saved = localStorage.getItem('tpx_blogs');
-    return saved ? JSON.parse(saved) : DEFAULT_BLOGS;
+    const raw = saved ? JSON.parse(saved) : DEFAULT_BLOGS;
+    const uniqueMap = new Map();
+    raw.forEach((item: BlogPost) => {
+      if (item && item.id) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+    return Array.from(uniqueMap.values());
   });
 
   const [leads, setLeads] = useState<Lead[]>(() => {
     const saved = localStorage.getItem('tpx_leads');
-    return saved ? JSON.parse(saved) : DEFAULT_LEADS;
+    const raw = saved ? JSON.parse(saved) : DEFAULT_LEADS;
+    const uniqueMap = new Map();
+    raw.forEach((item: Lead) => {
+      const id = item.id || item.email || Math.random().toString();
+      uniqueMap.set(id, item);
+    });
+    return Array.from(uniqueMap.values());
   });
 
   // UI View Controls State
   const [currentPageId, setCurrentPageId] = useState('home');
   const [viewMode, setViewMode] = useState<'live' | 'superadmin'>('live');
-  const [subRoute, setSubRoute] = useState<'dashboard' | 'admin' | 'visual'>('dashboard');
+  const [subRoute, setSubRoute] = useState<'dashboard' | 'admin' | 'visual' | 'crm'>('dashboard');
   const [adminActivePageId, setAdminActivePageId] = useState<string>('home');
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
@@ -116,6 +157,8 @@ export default function App() {
 
         if (moduleName === 'dashboard') {
           setSubRoute('dashboard');
+        } else if (moduleName === 'crm') {
+          setSubRoute('crm');
         } else if (moduleName === 'admin' && parts[2]) {
           setSubRoute('admin');
           setAdminActivePageId(parts[2].toLowerCase());
@@ -175,14 +218,45 @@ export default function App() {
           const d = json.data;
           setMongoDbStatus('connected');
           setMongoDbError(null);
-          if (d.pages && d.pages.length > 0) setPages(d.pages);
-          if (d.settings && d.settings.logoText) setSettings(d.settings);
+          if (d.pages && d.pages.length > 0) {
+            const uniqueMap = new Map();
+            d.pages.forEach((p: any) => {
+              if (p && p.id) {
+                uniqueMap.set(p.id, p);
+              }
+            });
+            setPages(Array.from(uniqueMap.values()));
+          }
+           if (d.settings && d.settings.logoText) setSettings(d.settings);
           if (d.media && d.media.length > 0) setMedia(d.media);
-          if (d.placed_students && d.placed_students.length > 0) setPlacedStudents(d.placed_students);
-          if (d.hiring_partners && d.hiring_partners.length > 0) setHiringPartners(d.hiring_partners);
-          if (d.courses && d.courses.length > 0) setCourses(d.courses);
-          if (d.blogs && d.blogs.length > 0) setBlogs(d.blogs);
-          if (d.leads && d.leads.length > 0) setLeads(d.leads);
+          if (d.placed_students && d.placed_students.length > 0) {
+            const m = new Map();
+            d.placed_students.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
+            setPlacedStudents(Array.from(m.values()));
+          }
+          if (d.hiring_partners && d.hiring_partners.length > 0) {
+            const m = new Map();
+            d.hiring_partners.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
+            setHiringPartners(Array.from(m.values()));
+          }
+          if (d.courses && d.courses.length > 0) {
+            const m = new Map();
+            d.courses.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
+            setCourses(Array.from(m.values()));
+          }
+          if (d.blogs && d.blogs.length > 0) {
+            const m = new Map();
+            d.blogs.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
+            setBlogs(Array.from(m.values()));
+          }
+          if (d.leads && d.leads.length > 0) {
+            const m = new Map();
+            d.leads.forEach((item: any) => {
+              const id = item.id || item.email || Math.random().toString();
+              m.set(id, item);
+            });
+            setLeads(Array.from(m.values()));
+          }
         } else {
           setMongoDbStatus('disconnected');
           if (json.connectionError) {
@@ -1095,6 +1169,11 @@ export default function App() {
                 leadsCount={leads.length}
                 mongoDbStatus={mongoDbStatus}
                 mongoDbError={mongoDbError}
+                onOpenGlobalAdmin={() => {
+                  setViewMode('superadmin');
+                  setSubRoute('crm');
+                  window.location.hash = '#/superadmin/crm';
+                }}
               />
             )}
 
@@ -1204,6 +1283,77 @@ export default function App() {
                 </div>
 
                 {renderVisualEditorPage()}
+              </div>
+            )}
+
+            {subRoute === 'crm' && (
+              <div className="flex-1 flex flex-col min-h-0 bg-slate-900">
+                {/* Embedded dynamic crm header toolbar */}
+                <div className="bg-slate-950 border-b border-slate-800 px-6 py-3 flex items-center justify-between text-white select-none">
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => { 
+                        setSubRoute('dashboard');
+                        window.location.hash = '#/superadmin/dashboard'; 
+                      }}
+                      className="px-3 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white rounded-lg transition-colors font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      ← Back to Dashboard
+                    </button>
+                    <div className="h-4 w-px bg-slate-800" />
+                    <span className="text-xs font-semibold text-slate-400">Database Collections Core Admin Hub</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {mongoDbStatus === 'connected' ? (
+                      <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-mono bg-emerald-950/40 border border-emerald-900 px-2.5 py-1 rounded">
+                        <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-ping" />
+                        <span>MongoDB Synced</span>
+                      </div>
+                    ) : mongoDbStatus === 'loading' ? (
+                      <div className="flex items-center gap-2 text-[10px] text-amber-400 font-mono bg-amber-950/40 border border-amber-900 px-2.5 py-1 rounded">
+                        <span className="h-1.5 w-1.5 bg-amber-400 rounded-full animate-pulse" />
+                        <span>Connecting MongoDB...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono bg-slate-950 border border-slate-800 px-2.5 py-1 rounded">
+                        <span className="h-1.5 w-1.5 bg-slate-500 rounded-full" />
+                        <span>MongoDB Disconnected (Local Active)</span>
+                      </div>
+                    )}
+                    <button 
+                      onClick={handleResetDatabase}
+                      className="px-3 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-rose-400 hover:text-rose-300 rounded-lg transition-colors font-semibold cursor-pointer"
+                      title="Reset database to original static templates"
+                    >
+                      Reset Draft Data
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                  <AdminPanel
+                    pages={pages}
+                    setPages={setPages}
+                    settings={settings}
+                    setSettings={setSettings}
+                    media={media}
+                    setMedia={setMedia}
+                    placedStudents={placedStudents}
+                    setPlacedStudents={setPlacedStudents}
+                    hiringPartners={hiringPartners}
+                    setHiringPartners={setHiringPartners}
+                    courses={courses}
+                    setCourses={setCourses}
+                    blogs={blogs}
+                    setBlogs={setBlogs}
+                    leads={leads}
+                    setLeads={setLeads}
+                    onLogout={handleLogout}
+                    onReset={handleResetDatabase}
+                    mongoDbStatus={mongoDbStatus}
+                    mongoDbError={mongoDbError}
+                  />
+                </div>
               </div>
             )}
           </div>
