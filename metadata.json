@@ -1,0 +1,6 @@
+{
+  "name": "Tentrapax",
+  "description": "Enterprise CMS and high-fidelity career development platform for Tentrapax, featuring live visual page editing, dynamic custom sections, responsive student LMS, and analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
