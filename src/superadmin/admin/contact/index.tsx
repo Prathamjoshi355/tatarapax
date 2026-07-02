@@ -214,26 +214,202 @@ export default function AdminContactPage({
 
                   {/* Render content inputs based on key-value pairs */}
                   {activeSection.content && (
-                    <div className="flex flex-col gap-4 mt-2">
-                      <h4 className="text-[10px] font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800/60 pb-1">Block Data Attributes</h4>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {Object.entries(activeSection.content).map(([key, val]) => {
-                          if (typeof val === 'string') {
-                            return (
-                              <div key={key} className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</label>
-                                <textarea 
-                                  value={val} 
-                                  onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)} 
-                                  className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans min-h-[50px]"
+                    <div className="flex flex-col gap-6 mt-2">
+                      {activeSection.type === 'contact-split' ? (
+                        <>
+                          {/* 1. MAP AND GLOBAL CONTACT INFO */}
+                          <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-4">
+                            <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                              Google Map Link & Global Contacts
+                            </h4>
+                            
+                            <div className="flex flex-col gap-2">
+                              <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                Google Map Embed Link (Iframe Src or Raw Link)
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={activeSection.content.mapUrl || ''}
+                                placeholder="Paste Google Map iframe src or link here (e.g., https://www.google.com/maps/embed...)"
+                                onChange={(e) => onEditField(activeSection.id, 'content.mapUrl', e.target.value)}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans w-full"
+                              />
+                              <p className="text-[10px] text-blue-400 font-sans mt-1 leading-relaxed">
+                                💡 <strong>Tip:</strong> You can paste an <strong>iframe embed code</strong>, a <strong>standard Google Maps link</strong>, or even just a <strong>simple address name</strong> (e.g., <em>"Arera Colony, Bhopal"</em>). Our system will automatically convert it into a beautiful interactive map!
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                  Global Phone
+                                </label>
+                                <input
+                                  type="text"
+                                  value={activeSection.content.phone || ''}
+                                  placeholder="+91 93000 12345"
+                                  onChange={(e) => onEditField(activeSection.id, 'content.phone', e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                                 />
                               </div>
-                            );
-                          }
-                          return null;
-                        })}
-                      </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                  Global Email
+                                </label>
+                                <input
+                                  type="text"
+                                  value={activeSection.content.email || ''}
+                                  placeholder="info@tantrapex.com"
+                                  onChange={(e) => onEditField(activeSection.id, 'content.email', e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                  Website Link
+                                </label>
+                                <input
+                                  type="text"
+                                  value={activeSection.content.website || ''}
+                                  placeholder="www.tantrapex.com"
+                                  onChange={(e) => onEditField(activeSection.id, 'content.website', e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 2. OFFICE LOCATIONS ARRAY */}
+                          <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-4">
+                            <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                              Office Locations & Addresses
+                            </h4>
+
+                            {/* Bhopal & Indore or list */}
+                            {(activeSection.content.offices || [
+                              { id: "of-1", name: "Bhopal Office", address: "123, Arera Colony, Bhopal, Madhya Pradesh - 462016" },
+                              { id: "of-2", name: "Indore Office", address: "456, Vijay Nagar, Indore, Madhya Pradesh - 452010" }
+                            ]).map((office: any, idx: number) => (
+                              <div key={office.id || idx} className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex flex-col gap-3">
+                                <h5 className="text-xs font-black text-slate-200">
+                                  Location #{idx + 1}: {office.name || "Unnamed Office"}
+                                </h5>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                      Office Name / Label
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={office.name || ''}
+                                      onChange={(e) => onEditField(activeSection.id, `content.offices.${idx}.name`, e.target.value)}
+                                      className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                    />
+                                  </div>
+
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                      Physical Address
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={office.address || ''}
+                                      onChange={(e) => onEditField(activeSection.id, `content.offices.${idx}.address`, e.target.value)}
+                                      className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* 3. SOCIAL NETWORKS */}
+                          <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-4">
+                            <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                              Social Media Links
+                            </h4>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                  LinkedIn URL
+                                </label>
+                                <input
+                                  type="text"
+                                  value={activeSection.content.linkedin || ''}
+                                  placeholder="https://linkedin.com/company/tantrapex"
+                                  onChange={(e) => onEditField(activeSection.id, 'content.linkedin', e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                  Instagram URL
+                                </label>
+                                <input
+                                  type="text"
+                                  value={activeSection.content.instagram || ''}
+                                  placeholder="https://instagram.com/tantrapex"
+                                  onChange={(e) => onEditField(activeSection.id, 'content.instagram', e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                  YouTube URL
+                                </label>
+                                <input
+                                  type="text"
+                                  value={activeSection.content.youtube || ''}
+                                  placeholder="https://youtube.com/tantrapex"
+                                  onChange={(e) => onEditField(activeSection.id, 'content.youtube', e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                  Facebook URL
+                                </label>
+                                <input
+                                  type="text"
+                                  value={activeSection.content.facebook || ''}
+                                  placeholder="https://facebook.com/tantrapex"
+                                  onChange={(e) => onEditField(activeSection.id, 'content.facebook', e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h4 className="text-[10px] font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800/60 pb-1">Block Data Attributes</h4>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {Object.entries(activeSection.content).map(([key, val]) => {
+                              if (typeof val === 'string') {
+                                return (
+                                  <div key={key} className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</label>
+                                    <textarea 
+                                      value={val} 
+                                      onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)} 
+                                      className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans min-h-[50px]"
+                                    />
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

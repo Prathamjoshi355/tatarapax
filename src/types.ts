@@ -79,6 +79,24 @@ export interface MediaItem {
   altText: string;
 }
 
+export interface Service {
+  id: string;
+  title: string;
+  slug: string;
+  category: string;
+  image: string;
+  shortDescription: string;
+  description: string;
+  buttonText: string;
+  buttonLink: string;
+  featured: boolean;
+  showOnHomepage: boolean;
+  published: boolean;
+  order: number;
+  createdAt: string;
+  seo: SEOConfig;
+}
+
 export interface BlogPost {
   id: string;
   title: string;
@@ -118,13 +136,16 @@ export interface HiringPartner {
   id: string;
   name: string;
   logoUrl: string;
+  isVisible?: boolean;
 }
 
 export interface Course {
   id: string;
   name: string;
-  category: 'programming' | 'aptitude' | 'soft-skills' | 'interview' | 'others';
+  category: 'programming' | 'aptitude' | 'soft-skills' | 'interview' | 'database' | 'others' | string;
   description: string;
   duration: string;
   topics: string[];
+  imageUrl?: string;
+  level?: string; // e.g. Beginner, Intermediate, Advanced
 }

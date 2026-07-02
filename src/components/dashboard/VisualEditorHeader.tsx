@@ -33,7 +33,7 @@ export default function VisualEditorHeader({
         </div>
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <span className="font-extrabold tracking-wider text-white uppercase text-[11px]">Tentrapax Design Studio</span>
+            <span className="font-extrabold tracking-wider text-white uppercase text-[11px]">Tantrapex Design Studio</span>
             <span className="bg-amber-500/10 text-amber-400 text-[9px] px-1.5 py-0.5 rounded border border-amber-500/20 font-bold uppercase tracking-widest animate-pulse">
               Visual Editor Mode
             </span>

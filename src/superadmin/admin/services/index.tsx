@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { CMSPage, CMSSection } from '../../../types';
 import { 
-  FileText, Layout, Settings, Save, MoveUp, MoveDown, Trash2 
+  FileText, Layout, Settings, Save, MoveUp, MoveDown, Trash2, Plus 
 } from 'lucide-react';
+import { UniversalImageUploader } from '../../../components/dashboard/UniversalImageUploader';
 
 interface AdminServicesPageProps {
   page: CMSPage;
@@ -234,6 +235,96 @@ export default function AdminServicesPage({
                           return null;
                         })}
                       </div>
+
+                      {/* Special Array List Editor for Services in services-grid */}
+                      {activeSection.type === 'services-grid' && (
+                        <div className="mt-6 border-t border-slate-800 pt-6 flex flex-col gap-4">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <div className="flex flex-col">
+                              <h5 className="text-xs font-extrabold text-white uppercase tracking-wider">Individual Services Cards</h5>
+                              <p className="text-[10px] text-slate-400 font-sans mt-0.5">Add, edit, rearrange or delete services rendered inside this grid.</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentServices = activeSection.content.services || [];
+                                const newList = [
+                                  ...currentServices,
+                                  {
+                                    id: "s-" + Date.now(),
+                                    title: "New Placement Service",
+                                    desc: "Describe this specialized student placement training program details.",
+                                    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=300"
+                                  }
+                                ];
+                                onEditField(activeSection.id, 'content.services', newList);
+                              }}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Add New Service</span>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-1">
+                            {(!activeSection.content.services || activeSection.content.services.length === 0) ? (
+                              <div className="text-center p-8 bg-slate-900/50 border border-dashed border-slate-800 rounded-xl text-slate-500 text-xs font-sans">
+                                No services found. Click "Add New Service" to insert one.
+                              </div>
+                            ) : (
+                              activeSection.content.services.map((serv: any, idx: number) => (
+                                <div key={serv.id || idx} className="p-4 bg-slate-900/80 border border-slate-800/80 rounded-xl flex flex-col gap-3 font-sans">
+                                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                    <span className="text-xs font-bold text-slate-300">Service #{idx + 1} - {serv.title || 'Untitled'}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm(`Are you sure you want to delete service "${serv.title || 'Untitled'}"?`)) {
+                                          const newList = activeSection.content.services.filter((_: any, sidx: number) => sidx !== idx);
+                                          onEditField(activeSection.id, 'content.services', newList);
+                                        }
+                                      }}
+                                      className="text-rose-400 hover:text-rose-300 p-1 bg-rose-950/30 hover:bg-rose-950/60 rounded transition-colors"
+                                      title="Delete Service Card"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 gap-4">
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service Title</label>
+                                      <input
+                                        type="text"
+                                        value={serv.title || ''}
+                                        onChange={(e) => onEditField(activeSection.id, `content.services.${idx}.title`, e.target.value)}
+                                        className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                      />
+                                    </div>
+                                    
+                                    <div className="flex flex-col gap-1.5">
+                                      <UniversalImageUploader
+                                        label="Service Image"
+                                        value={serv.image || ''}
+                                        onChange={(val) => onEditField(activeSection.id, `content.services.${idx}.image`, val)}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service Description</label>
+                                    <textarea
+                                      value={serv.desc || ''}
+                                      onChange={(e) => onEditField(activeSection.id, `content.services.${idx}.desc`, e.target.value)}
+                                      className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans min-h-[50px]"
+                                    />
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

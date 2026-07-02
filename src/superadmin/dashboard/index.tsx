@@ -55,7 +55,7 @@ export default function SuperAdminDashboard({
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold tracking-wider text-white uppercase text-sm">Tentrapax Control Center</span>
+              <span className="font-extrabold tracking-wider text-white uppercase text-sm">Tantrapex Control Center</span>
               <span className="bg-emerald-500/10 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold uppercase tracking-widest animate-pulse flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 <span>Super Admin</span>
@@ -282,8 +282,8 @@ export default function SuperAdminDashboard({
         {/* Dynamic Pages Listing Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {pages.map((p) => {
-            // Check if page has special support for admin/visual routing (Home, About, Services, Blog, Contact)
-            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact'].includes(p.id);
+            // Check if page has special support for admin/visual routing (Home, About, Services, Blog, Contact, Colleges)
+            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact', 'college-partnership'].includes(p.id);
 
             return (
               <div 

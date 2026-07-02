@@ -3,6 +3,7 @@ import { CMSPage, CMSSection, GlobalSettings } from '../../../types';
 import { 
   FileText, Layout, Settings, Save, RefreshCw, Eye, MoveUp, MoveDown, Plus, Trash2, Edit 
 } from 'lucide-react';
+import { UniversalImageUploader } from '../../../components/dashboard/UniversalImageUploader';
 
 interface AdminHomePageProps {
   page: CMSPage;
@@ -242,12 +243,10 @@ export default function AdminHomePage({
                               </select>
                             </div>
                             <div className="flex flex-col gap-1.5 col-span-2">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hero Background Image URL (Cover)</label>
-                              <input 
-                                type="text" 
+                              <UniversalImageUploader 
+                                label="Hero Background Image (Cover)"
                                 value={activeSection.content.heroImage || ''} 
-                                onChange={(e) => onEditField(activeSection.id, 'content.heroImage', e.target.value)} 
-                                className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                                onChange={(val) => onEditField(activeSection.id, 'content.heroImage', val)} 
                               />
                             </div>
                             <div className="flex flex-col gap-1.5">
@@ -752,7 +751,7 @@ export default function AdminHomePage({
                       )}
 
                       {/* Fallback simple properties reader */}
-                      {['success-stories', 'courses-home', 'workshops-home', 'blogs-home', 'cta-banner'].includes(activeSection.type) && (
+                      {['success-stories', 'courses-home', 'workshops-home', 'blogs-home', 'cta-banner', 'stories-and-partners', 'timeline'].includes(activeSection.type) && (
                         <div className="flex flex-col gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl">
                           <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Layout Block Configuration</h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

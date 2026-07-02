@@ -1,5 +1,5 @@
 import React from 'react';
-import { CMSPage, GlobalSettings, PlacedStudent, HiringPartner, Course, BlogPost, Lead } from '../../types';
+import { CMSPage, GlobalSettings, PlacedStudent, HiringPartner, Course, BlogPost, Lead, Service } from '../../types';
 import DynamicSection from '../../components/sections/DynamicSection';
 
 interface PublicServicesPageProps {
@@ -9,6 +9,7 @@ interface PublicServicesPageProps {
   hiringPartners: HiringPartner[];
   courses: Course[];
   blogs: BlogPost[];
+  allServices: Service[];
   onAddLead: (lead: Omit<Lead, 'id' | 'date'>) => void;
   onEditField: (sectionId: string, fieldPath: string, value: any) => void;
 }
@@ -20,6 +21,7 @@ export default function PublicServicesPage({
   hiringPartners,
   courses,
   blogs,
+  allServices,
   onAddLead,
   onEditField
 }: PublicServicesPageProps) {
@@ -35,6 +37,7 @@ export default function PublicServicesPage({
             allHiringPartners={hiringPartners}
             allCourses={courses}
             allBlogs={blogs}
+            allServices={allServices}
             onAddLead={onAddLead}
             settings={settings}
           />

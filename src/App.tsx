@@ -11,10 +11,10 @@ import VisualEditorSidebar from './components/dashboard/VisualEditorSidebar';
 import AdminPanel from './components/dashboard/AdminPanel';
 import PasswordGateway from './components/dashboard/PasswordGateway';
 import VisualEditorHeader from './components/dashboard/VisualEditorHeader';
-import { CMSPage, GlobalSettings, MediaItem, PlacedStudent, HiringPartner, Course, BlogPost, Lead, CMSSection } from './types';
+import { CMSPage, GlobalSettings, MediaItem, PlacedStudent, HiringPartner, Course, BlogPost, Lead, CMSSection, Service } from './types';
 import { 
   DEFAULT_PAGES, DEFAULT_SETTINGS, DEFAULT_MEDIA, DEFAULT_PLACED_STUDENTS, 
-  DEFAULT_HIRING_PARTNERS, DEFAULT_COURSES, DEFAULT_BLOGS, DEFAULT_LEADS 
+  DEFAULT_HIRING_PARTNERS, DEFAULT_COURSES, DEFAULT_BLOGS, DEFAULT_LEADS, DEFAULT_SERVICES 
 } from './db/defaultData';
 
 // Public Page implementations
@@ -23,6 +23,7 @@ import PublicAboutPage from './public/about';
 import PublicServicesPage from './public/services';
 import PublicBlogPage from './public/blog';
 import PublicContactPage from './public/contact';
+import PublicCollegePartnershipPage from './public/colleges';
 
 // Admin Page implementations
 import AdminHomePage from './superadmin/admin/home';
@@ -30,6 +31,7 @@ import AdminAboutPage from './superadmin/admin/about';
 import AdminServicesPage from './superadmin/admin/services';
 import AdminBlogPage from './superadmin/admin/blog';
 import AdminContactPage from './superadmin/admin/contact';
+import AdminCollegesPage from './superadmin/admin/colleges';
 
 // Visual Editor Page implementations
 import VisualEditorHomePage from './superadmin/visual/home';
@@ -40,6 +42,97 @@ import VisualEditorContactPage from './superadmin/visual/contact';
 
 // Super Admin Dashboard
 import SuperAdminDashboard from './superadmin/dashboard';
+
+const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
+  return rawPages.map(page => {
+    if (!page || !page.sections) return page;
+
+    // Find deprecated sections to migrate their values if the user previously edited them
+    const oldMissionVision = page.sections.find(s => s.type === 'mission-vision');
+    const oldWhyUsList = page.sections.find(s => s.type === 'why-us-list');
+
+    // Filter out separate mission-vision and why-us-list sections for the 'about' page
+    // because they are now beautifully integrated into the about-main section layout.
+    let cleanedSections = page.sections;
+    if (page.id === 'about') {
+      cleanedSections = page.sections.filter(
+        section => section.type !== 'mission-vision' && section.type !== 'why-us-list'
+      );
+    }
+
+    return {
+      ...page,
+      sections: cleanedSections.map(section => {
+        if (section.type === 'about-main') {
+          const content = section.content || {};
+          
+          return {
+            ...section,
+            content: {
+              ...content,
+              badgeText: content.badgeText || "2. ABOUT US",
+              missionTitle: content.missionTitle || oldMissionVision?.content?.missionTitle || "Our Mission",
+              missionDesc: content.missionDesc || oldMissionVision?.content?.missionDesc || "To empower students with the right skills, guidance and opportunities to build a successful career.",
+              missionImage: content.missionImage || oldMissionVision?.content?.missionImage || "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=300",
+              
+              visionTitle: content.visionTitle || oldMissionVision?.content?.visionTitle || "Our Vision",
+              visionDesc: content.visionDesc || oldMissionVision?.content?.visionDesc || "To become India's most trusted career partner for students and companies.",
+              visionImage: content.visionImage || oldMissionVision?.content?.visionImage || "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=300",
+              
+              whyTitle: content.whyTitle || oldWhyUsList?.title || "Why Choose Us?",
+              whyImage: content.whyImage || "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=300",
+              whyPoints: content.whyPoints || (oldWhyUsList?.content?.points?.map((pt: any) => ({ id: pt.id || `wp-${Math.random()}`, text: pt.title })) || [
+                { id: "wp-1", text: "Industry Expert Mentors" },
+                { id: "wp-2", text: "Personalized Training" },
+                { id: "wp-3", text: "100% Placement Assistance" },
+                { id: "wp-4", text: "Practical Learning Approach" },
+                { id: "wp-5", text: "Strong Industry Connections" },
+                { id: "wp-6", text: "Lifetime Support" }
+              ])
+            }
+          };
+        }
+        if (section.type === 'about-journey') {
+          const content = section.content || {};
+          const defaultImages = [
+            "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=300",
+            "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=300",
+            "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=300",
+            "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=300"
+          ];
+          const milestones = (content.milestones || []).map((m: any, idx: number) => ({
+            ...m,
+            image: m.image || defaultImages[idx] || "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=300"
+          }));
+          return {
+            ...section,
+            content: {
+              ...content,
+              milestones
+            }
+          };
+        }
+        if (section.type === 'lms-dashboard') {
+          return {
+            ...section,
+            design: {
+              ...section.design,
+              backgroundColor: "#ffffff",
+              textColor: "#334155",
+              headingColor: "#071B4D",
+              buttonColor: "#071B4D",
+              buttonHoverColor: "#00103a",
+              buttonTextColor: "#ffffff",
+              cardBackgroundColor: "#f8fafc",
+              borderColor: "#e2e8f0"
+            }
+          };
+        }
+        return section;
+      })
+    };
+  });
+};
 
 export default function App() {
   // Master persistent states loading from localStorage
@@ -52,17 +145,67 @@ export default function App() {
         uniqueMap.set(p.id, p);
       }
     });
-    return Array.from(uniqueMap.values());
+    return sanitizePages(Array.from(uniqueMap.values()));
   });
 
   const [settings, setSettings] = useState<GlobalSettings>(() => {
     const saved = localStorage.getItem('tpx_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    if (parsed && parsed.menuItems) {
+      const hasWorkshops = parsed.menuItems.some((m: any) => m.pageId === 'workshops');
+      const hasBlog = parsed.menuItems.some((m: any) => m.pageId === 'blog');
+      const hasLms = parsed.menuItems.some((m: any) => m.pageId === 'lms');
+      
+      let updatedMenu = [...parsed.menuItems];
+      let maxOrder = Math.max(...updatedMenu.map((m: any) => m.order || 0), 0);
+      
+      if (!hasWorkshops) {
+        maxOrder++;
+        updatedMenu.push({
+          id: "menu-workshops",
+          label: "Workshops",
+          pageId: "workshops",
+          order: maxOrder,
+          isVisible: true
+        });
+      }
+      
+      if (!hasBlog) {
+        maxOrder++;
+        updatedMenu.push({
+          id: "menu-blog",
+          label: "Blogs",
+          pageId: "blog",
+          order: maxOrder,
+          isVisible: true
+        });
+      }
+      
+      if (!hasLms) {
+        maxOrder++;
+        updatedMenu.push({
+          id: "menu-lms",
+          label: "LMS",
+          pageId: "lms",
+          order: maxOrder,
+          isVisible: true
+        });
+      }
+      parsed.menuItems = updatedMenu;
+    }
+    return parsed;
   });
 
   const [media, setMedia] = useState<MediaItem[]>(() => {
     const saved = localStorage.getItem('tpx_media');
-    return saved ? JSON.parse(saved) : DEFAULT_MEDIA;
+    const rawMedia = saved ? JSON.parse(saved) : DEFAULT_MEDIA;
+    const uniqueMap = new Map();
+    rawMedia.forEach((m: MediaItem) => {
+      if (m && m.id) {
+        uniqueMap.set(m.id, m);
+      }
+    });
+    return Array.from(uniqueMap.values());
   });
 
   const [placedStudents, setPlacedStudents] = useState<PlacedStudent[]>(() => {
@@ -106,6 +249,18 @@ export default function App() {
     const raw = saved ? JSON.parse(saved) : DEFAULT_BLOGS;
     const uniqueMap = new Map();
     raw.forEach((item: BlogPost) => {
+      if (item && item.id) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  });
+
+  const [services, setServices] = useState<Service[]>(() => {
+    const saved = localStorage.getItem('tpx_services');
+    const raw = saved ? JSON.parse(saved) : DEFAULT_SERVICES;
+    const uniqueMap = new Map();
+    raw.forEach((item: Service) => {
       if (item && item.id) {
         uniqueMap.set(item.id, item);
       }
@@ -225,7 +380,7 @@ export default function App() {
                 uniqueMap.set(p.id, p);
               }
             });
-            setPages(Array.from(uniqueMap.values()));
+            setPages(sanitizePages(Array.from(uniqueMap.values())));
           }
            if (d.settings && d.settings.logoText) setSettings(d.settings);
           if (d.media && d.media.length > 0) setMedia(d.media);
@@ -248,6 +403,11 @@ export default function App() {
             const m = new Map();
             d.blogs.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
             setBlogs(Array.from(m.values()));
+          }
+          if (d.services && d.services.length > 0) {
+            const m = new Map();
+            d.services.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
+            setServices(Array.from(m.values()));
           }
           if (d.leads && d.leads.length > 0) {
             const m = new Map();
@@ -302,6 +462,10 @@ export default function App() {
   }, [blogs]);
 
   useEffect(() => {
+    localStorage.setItem('tpx_services', JSON.stringify(services));
+  }, [services]);
+
+  useEffect(() => {
     localStorage.setItem('tpx_leads', JSON.stringify(leads));
   }, [leads]);
 
@@ -322,6 +486,7 @@ export default function App() {
             hiring_partners: hiringPartners,
             courses,
             blogs,
+            services,
             leads
           })
         });
@@ -345,11 +510,11 @@ export default function App() {
     }, 1500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [pages, settings, media, placedStudents, hiringPartners, courses, blogs, leads]);
+  }, [pages, settings, media, placedStudents, hiringPartners, courses, blogs, services, leads]);
 
   // Reset database state callback
   const handleResetDatabase = () => {
-    const confirmReset = window.confirm("Are you sure you want to restore the Tentrapax demo database back to default themes, templates, and students?");
+    const confirmReset = window.confirm("Are you sure you want to restore the Tantrapex demo database back to default themes, templates, and students?");
     if (confirmReset) {
       localStorage.clear();
       setPages(DEFAULT_PAGES);
@@ -359,6 +524,7 @@ export default function App() {
       setHiringPartners(DEFAULT_HIRING_PARTNERS);
       setCourses(DEFAULT_COURSES);
       setBlogs(DEFAULT_BLOGS);
+      setServices(DEFAULT_SERVICES);
       setLeads(DEFAULT_LEADS);
       setCurrentPageId('home');
       setViewMode('live');
@@ -399,27 +565,18 @@ export default function App() {
                   ...updatedSection.content,
                   [subKey]: value
                 };
-              } else if (keys.length === 4 && keys[1] === 'stats') {
-                // e.g. "content.stats.2.count"
+              } else if (keys.length === 4) {
+                const arrayKey = keys[1];
                 const index = parseInt(keys[2], 10);
                 const subKey = keys[3];
-                const statsCopy = [...updatedSection.content.stats];
-                statsCopy[index] = { ...statsCopy[index], [subKey]: value };
-                updatedSection.content = { ...updatedSection.content, stats: statsCopy };
-              } else if (keys.length === 4 && keys[1] === 'cards') {
-                // e.g. "content.cards.2.title"
-                const index = parseInt(keys[2], 10);
-                const subKey = keys[3];
-                const cardsCopy = [...updatedSection.content.cards];
-                cardsCopy[index] = { ...cardsCopy[index], [subKey]: value };
-                updatedSection.content = { ...updatedSection.content, cards: cardsCopy };
-              } else if (keys.length === 4 && keys[1] === 'steps') {
-                // e.g. "content.steps.0.label"
-                const index = parseInt(keys[2], 10);
-                const subKey = keys[3];
-                const stepsCopy = [...updatedSection.content.steps];
-                stepsCopy[index] = { ...stepsCopy[index], [subKey]: value };
-                updatedSection.content = { ...updatedSection.content, steps: stepsCopy };
+                if (Array.isArray(updatedSection.content[arrayKey])) {
+                  const arrayCopy = [...updatedSection.content[arrayKey]];
+                  arrayCopy[index] = { ...arrayCopy[index], [subKey]: value };
+                  updatedSection.content = {
+                    ...updatedSection.content,
+                    [arrayKey]: arrayCopy
+                  };
+                }
               }
             }
             return updatedSection;
@@ -598,6 +755,7 @@ export default function App() {
             hiringPartners={hiringPartners}
             courses={courses}
             blogs={blogs}
+            allServices={services}
             onAddLead={handleAddLead}
             onEditField={handleEditField}
           />
@@ -618,6 +776,19 @@ export default function App() {
       case 'contact':
         return (
           <PublicContactPage
+            page={activePage}
+            settings={settings}
+            placedStudents={placedStudents}
+            hiringPartners={hiringPartners}
+            courses={courses}
+            blogs={blogs}
+            onAddLead={handleAddLead}
+            onEditField={handleEditField}
+          />
+        );
+      case 'college-partnership':
+        return (
+          <PublicCollegePartnershipPage
             page={activePage}
             settings={settings}
             placedStudents={placedStudents}
@@ -675,24 +846,18 @@ export default function App() {
                     ...updatedSection.content,
                     [subKey]: value
                   };
-                } else if (keys.length === 4 && keys[1] === 'stats') {
+                } else if (keys.length === 4) {
+                  const arrayKey = keys[1];
                   const index = parseInt(keys[2], 10);
                   const subKey = keys[3];
-                  const statsCopy = [...updatedSection.content.stats];
-                  statsCopy[index] = { ...statsCopy[index], [subKey]: value };
-                  updatedSection.content = { ...updatedSection.content, stats: statsCopy };
-                } else if (keys.length === 4 && keys[1] === 'cards') {
-                  const index = parseInt(keys[2], 10);
-                  const subKey = keys[3];
-                  const cardsCopy = [...updatedSection.content.cards];
-                  cardsCopy[index] = { ...cardsCopy[index], [subKey]: value };
-                  updatedSection.content = { ...updatedSection.content, cards: cardsCopy };
-                } else if (keys.length === 4 && keys[1] === 'steps') {
-                  const index = parseInt(keys[2], 10);
-                  const subKey = keys[3];
-                  const stepsCopy = [...updatedSection.content.steps];
-                  stepsCopy[index] = { ...stepsCopy[index], [subKey]: value };
-                  updatedSection.content = { ...updatedSection.content, steps: stepsCopy };
+                  if (Array.isArray(updatedSection.content[arrayKey])) {
+                    const arrayCopy = [...updatedSection.content[arrayKey]];
+                    arrayCopy[index] = { ...arrayCopy[index], [subKey]: value };
+                    updatedSection.content = {
+                      ...updatedSection.content,
+                      [arrayKey]: arrayCopy
+                    };
+                  }
                 }
               }
               return updatedSection;
@@ -750,6 +915,8 @@ export default function App() {
             onEditField={handleEditFieldOnPage}
             onMoveSection={handleMoveSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
+            media={media}
+            setMedia={setMedia}
           />
         );
       case 'services':
@@ -775,6 +942,16 @@ export default function App() {
       case 'contact':
         return (
           <AdminContactPage
+            page={pageToEdit}
+            setPages={setPages}
+            onEditField={handleEditFieldOnPage}
+            onMoveSection={handleMoveSectionOnPage}
+            onDeleteSection={handleDeleteSectionOnPage}
+          />
+        );
+      case 'college-partnership':
+        return (
+          <AdminCollegesPage
             page={pageToEdit}
             setPages={setPages}
             onEditField={handleEditFieldOnPage}
@@ -819,24 +996,18 @@ export default function App() {
                     ...updatedSection.content,
                     [subKey]: value
                   };
-                } else if (keys.length === 4 && keys[1] === 'stats') {
+                } else if (keys.length === 4) {
+                  const arrayKey = keys[1];
                   const index = parseInt(keys[2], 10);
                   const subKey = keys[3];
-                  const statsCopy = [...updatedSection.content.stats];
-                  statsCopy[index] = { ...statsCopy[index], [subKey]: value };
-                  updatedSection.content = { ...updatedSection.content, stats: statsCopy };
-                } else if (keys.length === 4 && keys[1] === 'cards') {
-                  const index = parseInt(keys[2], 10);
-                  const subKey = keys[3];
-                  const cardsCopy = [...updatedSection.content.cards];
-                  cardsCopy[index] = { ...cardsCopy[index], [subKey]: value };
-                  updatedSection.content = { ...updatedSection.content, cards: cardsCopy };
-                } else if (keys.length === 4 && keys[1] === 'steps') {
-                  const index = parseInt(keys[2], 10);
-                  const subKey = keys[3];
-                  const stepsCopy = [...updatedSection.content.steps];
-                  stepsCopy[index] = { ...stepsCopy[index], [subKey]: value };
-                  updatedSection.content = { ...updatedSection.content, steps: stepsCopy };
+                  if (Array.isArray(updatedSection.content[arrayKey])) {
+                    const arrayCopy = [...updatedSection.content[arrayKey]];
+                    arrayCopy[index] = { ...arrayCopy[index], [subKey]: value };
+                    updatedSection.content = {
+                      ...updatedSection.content,
+                      [arrayKey]: arrayCopy
+                    };
+                  }
                 }
               }
               return updatedSection;
@@ -1015,6 +1186,7 @@ export default function App() {
             hiringPartners={hiringPartners}
             courses={courses}
             blogs={blogs}
+            allServices={services}
             selectedSectionId={selectedSectionId}
             setSelectedSectionId={setSelectedSectionId}
             onEditField={handleEditFieldOnPage}
@@ -1061,6 +1233,16 @@ export default function App() {
             onDuplicateSection={handleDuplicateSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
             onAddSection={handleAddSectionOnPage}
+          />
+        );
+      case 'college-partnership':
+        return (
+          <AdminCollegesPage
+            page={pageToEdit}
+            setPages={setPages}
+            onEditField={handleEditFieldOnPage}
+            onMoveSection={handleMoveSectionOnPage}
+            onDeleteSection={handleDeleteSectionOnPage}
           />
         );
       default:
@@ -1346,6 +1528,8 @@ export default function App() {
                     setCourses={setCourses}
                     blogs={blogs}
                     setBlogs={setBlogs}
+                    services={services}
+                    setServices={setServices}
                     leads={leads}
                     setLeads={setLeads}
                     onLogout={handleLogout}

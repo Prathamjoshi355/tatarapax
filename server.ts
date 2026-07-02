@@ -3,8 +3,17 @@ import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { MongoClient, Db } from "mongodb";
+import { v2 as cloudinary } from "cloudinary";
 
 dotenv.config();
+
+if (process.env.CLOUDINARY_CLOUD_NAME) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
 
 const app = express();
 const PORT = 3000;
@@ -117,6 +126,36 @@ app.get("/api/health", async (req, res) => {
     connectionError,
     timestamp: new Date().toISOString()
   });
+});
+
+// Image upload API
+app.post("/api/upload-image", async (req, res) => {
+  try {
+    const { data, folder = "Tantrapex" } = req.body || {};
+    if (!data) {
+      return res.status(400).json({ success: false, message: "Missing image data" });
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME) {
+      console.log("Cloudinary not configured. Falling back to data URL storage.");
+      return res.json({
+        success: true,
+        url: data,
+        msg: "Stored as local data URL because Cloudinary is not configured."
+      });
+    }
+
+    const result = await cloudinary.uploader.upload(data, {
+      folder,
+      overwrite: false,
+      resource_type: "auto",
+    });
+
+    res.json({ success: true, url: result.secure_url, public_id: result.public_id });
+  } catch (err: any) {
+    console.error("Upload to Cloudinary failed:", err);
+    res.status(500).json({ success: false, message: err.message || String(err) });
+  }
 });
 
 // Load all collections at once

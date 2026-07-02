@@ -1,5 +1,5 @@
 import React from 'react';
-import { CMSPage, GlobalSettings, PlacedStudent, HiringPartner, Course, BlogPost } from '../../../types';
+import { CMSPage, GlobalSettings, PlacedStudent, HiringPartner, Course, BlogPost, Service } from '../../../types';
 import Header from '../../../components/common/Header';
 import Footer from '../../../components/common/Footer';
 import DynamicSection from '../../../components/sections/DynamicSection';
@@ -12,6 +12,7 @@ interface VisualEditorServicesPageProps {
   hiringPartners: HiringPartner[];
   courses: Course[];
   blogs: BlogPost[];
+  allServices: Service[];
   selectedSectionId: string | null;
   setSelectedSectionId: (id: string | null) => void;
   onEditField: (sectionId: string, fieldPath: string, value: any) => void;
@@ -29,6 +30,7 @@ export default function VisualEditorServicesPage({
   hiringPartners,
   courses,
   blogs,
+  allServices,
   selectedSectionId,
   setSelectedSectionId,
   onEditField,
@@ -75,6 +77,7 @@ export default function VisualEditorServicesPage({
                   allHiringPartners={hiringPartners}
                   allCourses={courses}
                   allBlogs={blogs}
+                  allServices={allServices}
                   onAddLead={() => {}}
                   settings={settings}
                 />

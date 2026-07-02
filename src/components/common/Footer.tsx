@@ -41,7 +41,7 @@ export default function Footer({
             </div>
             <div className="flex flex-col">
               <span className="font-display font-bold text-base text-white tracking-tight uppercase leading-none">
-                {settings.logoText || "TENTRAPAX"}
+                {settings.logoText || "TANTRAPEX"}
               </span>
               <span className="text-[8px] font-sans font-medium text-slate-400 tracking-wider uppercase mt-1">
                 {settings.logoSubText || "YOUR CAREER, OUR PRIORITY"}
@@ -49,7 +49,7 @@ export default function Footer({
             </div>
           </div>
           <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-            Tentrapax is a premier career development and placement consultancy helping students build premium technical skills, crack demanding interviews, and enter leading MNC corporate roles.
+            Tantrapex is a premier career development and placement consultancy helping students build premium technical skills, crack demanding interviews, and enter leading MNC corporate roles.
           </p>
 
           {/* Social Links */}
@@ -160,7 +160,7 @@ export default function Footer({
       <div className="border-t border-white/5 bg-[#041030] py-6 px-6">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
           <span>
-            &copy; 2026 Tentrapax Career Development and Placement Consultancy. All rights reserved.
+            &copy; 2026 Tantrapex Career Development and Placement Consultancy. All rights reserved.
           </span>
           <span className="flex items-center gap-3">
             <a href="#privacy" className="hover:text-[#F7C400]">Privacy Policy</a>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CMSPage, CMSSection } from '../../../types';
+import { CMSPage, CMSSection, MediaItem } from '../../../types';
 import { 
   FileText, Layout, Settings, Save, MoveUp, MoveDown, Trash2 
 } from 'lucide-react';
@@ -10,6 +10,8 @@ interface AdminAboutPageProps {
   onEditField: (sectionId: string, fieldPath: string, value: any) => void;
   onMoveSection: (direction: 'up' | 'down', sectionId: string) => void;
   onDeleteSection: (sectionId: string) => void;
+  media?: MediaItem[];
+  setMedia?: React.Dispatch<React.SetStateAction<MediaItem[]>>;
 }
 
 export default function AdminAboutPage({
@@ -17,7 +19,9 @@ export default function AdminAboutPage({
   setPages,
   onEditField,
   onMoveSection,
-  onDeleteSection
+  onDeleteSection,
+  media,
+  setMedia
 }: AdminAboutPageProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(page.sections[0]?.id || null);
   const [seoTitle, setSeoTitle] = useState(page.seo.title);
@@ -219,7 +223,86 @@ export default function AdminAboutPage({
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {Object.entries(activeSection.content).map(([key, val]) => {
+                          // Simple string fields (including single-image fields)
                           if (typeof val === 'string') {
+                            const lower = key.toLowerCase();
+                            const isImageKey = lower.includes('image') || lower.includes('img') || lower.includes('photo');
+
+                            if (isImageKey) {
+                              return (
+                                <div key={key} className="flex flex-col gap-1.5">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</label>
+                                  <input
+                                    type="text"
+                                    value={val}
+                                    onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)}
+                                    placeholder="Paste image URL here"
+                                    className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                  />
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <label className="text-xs text-slate-400">Upload</label>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (!f) return;
+                                        const reader = new FileReader();
+                                        reader.onload = async () => {
+                                          const dataUrl = String(reader.result || '');
+                                          // Try uploading to serverless endpoint which pushes to Cloudinary.
+                                          // If the endpoint is not available (404) or upload fails, fall back to using the data URL locally.
+                                          try {
+                                            const resp = await fetch('/api/upload-image', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ data: dataUrl, folder: 'Tantrapex' })
+                                            });
+
+                                            if (resp.ok) {
+                                              let json: any;
+                                              try {
+                                                json = await resp.json();
+                                              } catch (e) {
+                                                json = null;
+                                              }
+
+                                              if (json && json.success && json.url) {
+                                                const name = f.name;
+                                                const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                                if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
+                                                onEditField(activeSection.id, `content.${key}`, newItem.url);
+                                                return;
+                                              }
+                                            }
+
+                                            // Fallback: use data URL directly when upload endpoint isn't present or failed
+                                            const name = f.name;
+                                            const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                            if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
+                                            onEditField(activeSection.id, `content.${key}`, fallbackItem.url);
+                                          } catch (err) {
+                                            console.error('Upload attempt failed, falling back to data URL:', err);
+                                            const name = f.name;
+                                            const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                            if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
+                                            onEditField(activeSection.id, `content.${key}`, fallbackItem.url);
+                                          }
+                                        };
+                                        reader.readAsDataURL(f);
+                                      }}
+                                      className="text-xs text-slate-400"
+                                    />
+                                  </div>
+                                  {val && (
+                                    <div className="mt-2">
+                                      <img src={val} alt={key} className="w-32 h-20 object-cover rounded-md border border-slate-800" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+
                             return (
                               <div key={key} className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</label>
@@ -231,6 +314,110 @@ export default function AdminAboutPage({
                               </div>
                             );
                           }
+
+                          // Arrays of objects (e.g., points, milestones)
+                          if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+                            return (
+                              <div key={key} className="col-span-1 md:col-span-2">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">{key.replace(/([A-Z])/g, ' $1')}</label>
+                                <div className="flex flex-col gap-3">
+                                  {val.map((item: any, idx: number) => (
+                                    <div key={`${item.id || 'item'}-${idx}`} className="bg-slate-900 p-3 rounded-md border border-slate-800">
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        {Object.entries(item).map(([subKey, subVal]) => {
+                                          if (typeof subVal === 'string') {
+                                            const subLower = subKey.toLowerCase();
+                                            const isImg = subLower.includes('image') || subLower.includes('img') || subLower.includes('photo') || subLower === 'image' || subLower === 'avatar';
+                                            if (isImg) {
+                                              return (
+                                                <div key={subKey} className="flex flex-col gap-1">
+                                                  <label className="text-[10px] text-slate-400">{subKey.replace(/([A-Z])/g, ' $1')}</label>
+                                                  <input
+                                                    type="text"
+                                                    value={subVal}
+                                                    onChange={(e) => onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, e.target.value)}
+                                                    placeholder="Paste image URL here"
+                                                    className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                                  />
+                                                  <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => {
+                                                      const f = e.target.files?.[0];
+                                                      if (!f) return;
+                                                      const reader = new FileReader();
+                                                      reader.onload = async () => {
+                                                        const dataUrl = String(reader.result || '');
+                                                        try {
+                                                          const resp = await fetch('/api/upload-image', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ data: dataUrl, folder: 'Tantrapex' })
+                                                          });
+
+                                                          if (resp.ok) {
+                                                            let json: any;
+                                                            try {
+                                                              json = await resp.json();
+                                                            } catch (e) {
+                                                              json = null;
+                                                            }
+
+                                                            if (json && json.success && json.url) {
+                                                              const name = f.name;
+                                                              const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                                              if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
+                                                              onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, newItem.url);
+                                                              return;
+                                                            }
+                                                          }
+
+                                                          // Fallback to data URL
+                                                          const name = f.name;
+                                                          const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                                          if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
+                                                          onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, fallbackItem.url);
+                                                        } catch (err) {
+                                                          console.error('Upload attempt failed, falling back to data URL:', err);
+                                                          const name = f.name;
+                                                          const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                                          if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
+                                                          onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, fallbackItem.url);
+                                                        }
+                                                      };
+                                                      reader.readAsDataURL(f);
+                                                    }}
+                                                    className="text-xs text-slate-400 mt-1"
+                                                  />
+                                                  {subVal && (
+                                                    <img src={subVal} alt={subKey} className="w-24 h-16 object-cover rounded-md mt-2 border border-slate-800" />
+                                                  )}
+                                                </div>
+                                              );
+                                            }
+
+                                            return (
+                                              <div key={subKey} className="flex flex-col gap-1">
+                                                <label className="text-[10px] text-slate-400">{subKey.replace(/([A-Z])/g, ' $1')}</label>
+                                                <input
+                                                  type="text"
+                                                  value={subVal}
+                                                  onChange={(e) => onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, e.target.value)}
+                                                  className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                                                />
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+
                           return null;
                         })}
                       </div>
