@@ -214,6 +214,27 @@ export default function AdminPanel({
     }
   };
 
+  const loadRazorpayScript = () => {
+    return new Promise<boolean>((resolve) => {
+      if (typeof window === 'undefined') {
+        resolve(false);
+        return;
+      }
+
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleAdminTestPayment = async () => {
     if (!settings.email) {
       triggerToast('Please set the admin email in Global Settings first.');
@@ -224,40 +245,102 @@ export default function AdminPanel({
     setAdminTestPaymentStatus({ type: null, message: null });
 
     try {
-      const response = await fetch('/api/admin/test-razorpay-payment', {
+      const keyRes = await fetch('/api/razorpay-key');
+      const keyData = await parseJsonResponse(keyRes);
+      if (!keyRes.ok || !keyData.keyId) {
+        throw new Error(keyData.error || 'Razorpay key is not configured.');
+      }
+
+      const orderRes = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: settings.email,
-          amount: 1
+          amount: 1,
+          currency: 'INR',
+          receipt: `admin-test-${Date.now()}`,
+          notes: {
+            type: 'admin_test_payment',
+            email: settings.email
+          }
         })
       });
 
-      const data = await parseJsonResponse(response);
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Test payment could not be completed.');
+      const orderData = await parseJsonResponse(orderRes);
+      if (!orderRes.ok || !orderData.success || !orderData.order?.id) {
+        throw new Error(orderData.error || 'Razorpay order could not be created.');
       }
 
-      const currentPurchases = getPlanPurchases();
-      const paymentRecord = {
-        paymentId: data.paymentId || `pay_admin_test_${Date.now()}`,
-        orderId: data.orderId || `order_admin_test_${Date.now()}`,
-        date: new Date().toLocaleString('en-IN', {
-          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        }),
-        planName: 'Razorpay Test Payment',
-        amount: 1,
-        studentName: 'Admin Test',
-        studentEmail: settings.email,
-        studentPhone: 'N/A'
-      };
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !(window as any).Razorpay) {
+        throw new Error('Razorpay checkout script could not load.');
+      }
 
-      localStorage.setItem('tpx_plan_purchases', JSON.stringify([paymentRecord, ...currentPurchases]));
-      setAdminTestPaymentStatus({
-        type: 'success',
-        message: `₹1 test payment completed and email sent to ${settings.email}.`
+      const rzp = new (window as any).Razorpay({
+        key: keyData.keyId,
+        amount: 1 * 100,
+        currency: 'INR',
+        name: 'Tantrapex CRM Test Payment',
+        description: '₹1 actual Razorpay payment test',
+        order_id: orderData.order.id,
+        handler: async function (response: any) {
+          const confirmRes = await fetch('/api/admin/test-razorpay-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: settings.email,
+              amount: 1,
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id
+            })
+          });
+
+          const confirmData = await parseJsonResponse(confirmRes);
+          if (!confirmRes.ok || !confirmData.success) {
+            throw new Error(confirmData.error || 'Razorpay test payment succeeded but confirmation mail failed.');
+          }
+
+          const currentPurchases = getPlanPurchases();
+          const paymentRecord = {
+            paymentId: confirmData.paymentId || response.razorpay_payment_id || `pay_admin_test_${Date.now()}`,
+            orderId: confirmData.orderId || response.razorpay_order_id || `order_admin_test_${Date.now()}`,
+            date: new Date().toLocaleString('en-IN', {
+              day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            }),
+            planName: 'Razorpay Test Payment',
+            amount: 1,
+            studentName: 'Admin Test',
+            studentEmail: settings.email,
+            studentPhone: 'N/A'
+          };
+
+          localStorage.setItem('tpx_plan_purchases', JSON.stringify([paymentRecord, ...currentPurchases]));
+          setAdminTestPaymentStatus({
+            type: 'success',
+            message: `₹1 actual Razorpay payment completed and email sent to ${settings.email}.`
+          });
+          triggerToast(`₹1 Razorpay test payment complete. Mail sent to ${settings.email}.`);
+          setIsRunningAdminTestPayment(false);
+        },
+        prefill: {
+          email: settings.email,
+          contact: '0000000000'
+        },
+        theme: {
+          color: '#10b981'
+        },
+        modal: {
+          ondismiss: function () {
+            setIsRunningAdminTestPayment(false);
+            setAdminTestPaymentStatus({
+              type: 'error',
+              message: 'Razorpay checkout was closed before payment completion.'
+            });
+            triggerToast('Razorpay checkout closed without payment.');
+          }
+        }
       });
-      triggerToast(`₹1 Razorpay test payment complete. Mail sent to ${settings.email}.`);
+
+      rzp.open();
     } catch (err: any) {
       console.error('Admin test payment error:', err);
       setAdminTestPaymentStatus({
@@ -265,7 +348,6 @@ export default function AdminPanel({
         message: err.message || 'Something went wrong while processing the test payment.'
       });
       triggerToast('Razorpay test payment failed. Check the backend keys or SMTP config.');
-    } finally {
       setIsRunningAdminTestPayment(false);
     }
   };

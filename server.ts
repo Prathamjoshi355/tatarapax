@@ -283,6 +283,8 @@ app.post("/api/admin/test-razorpay-payment", async (req, res) => {
   try {
     const incomingEmail = String(req.body?.email || process.env.SMTP_USER || "").trim();
     const amount = Number(req.body?.amount ?? 1);
+    const paymentIdFromBody = String(req.body?.paymentId || "").trim();
+    const orderIdFromBody = String(req.body?.orderId || "").trim();
 
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ success: false, error: "Amount must be greater than zero." });
@@ -292,37 +294,20 @@ app.post("/api/admin/test-razorpay-payment", async (req, res) => {
       return res.status(400).json({ success: false, error: "No admin email provided for the payment confirmation email." });
     }
 
-    const receipt = `admin-test-${Date.now()}`;
-    const order = await createRazorpayOrder({
-      amount,
-      currency: "INR",
-      receipt,
-      notes: {
-        type: "admin_test_payment",
-        sender: "crm-admin-panel"
-      }
-    });
+    const finalPaymentId = paymentIdFromBody || `pay_admin_test_${Date.now()}`;
+    const finalOrderId = orderIdFromBody || `order_admin_test_${Date.now()}`;
 
-    if (!order.success || !order.order?.id) {
-      return res.status(500).json({
-        success: false,
-        error: order.error || "Razorpay order creation failed for the test payment.",
-        keyId: order.keyId || ""
-      });
-    }
-
-    const paymentId = `pay_admin_test_${Date.now()}`;
     const mailResult = await sendEmail({
       to: incomingEmail,
       toName: "Admin",
       subject: `Razorpay Test Payment Successful - ₹${amount}`,
-      text: `Your Razorpay test payment of ₹${amount} was successfully processed using the active CRM integration. Order ID: ${order.order.id}, Payment ID: ${paymentId}.`,
+      text: `Your Razorpay test payment of ₹${amount} was successfully processed using the active CRM integration. Order ID: ${finalOrderId}, Payment ID: ${finalPaymentId}.`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 24px;">
           <h2 style="margin-bottom: 12px; color: #0f172a;">Razorpay Test Payment Successful</h2>
           <p style="margin: 8px 0;">Your Razorpay test payment of <strong>₹${amount}</strong> was completed successfully.</p>
-          <p style="margin: 8px 0;"><strong>Order ID:</strong> ${order.order.id}</p>
-          <p style="margin: 8px 0;"><strong>Payment ID:</strong> ${paymentId}</p>
+          <p style="margin: 8px 0;"><strong>Order ID:</strong> ${finalOrderId}</p>
+          <p style="margin: 8px 0;"><strong>Payment ID:</strong> ${finalPaymentId}</p>
           <p style="margin-top: 18px; color: #475569;">This was sent from the CRM admin panel using the existing configured SMTP mailer.</p>
         </div>
       `
@@ -331,9 +316,8 @@ app.post("/api/admin/test-razorpay-payment", async (req, res) => {
     return res.json({
       success: true,
       amount,
-      paymentId,
-      orderId: order.order.id,
-      keyId: order.keyId || "",
+      paymentId: finalPaymentId,
+      orderId: finalOrderId,
       emailSent: mailResult.success,
       emailError: mailResult.error || null
     });

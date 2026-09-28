@@ -4910,7 +4910,7 @@ export default function DynamicSection({
                       order_id: orderData?.order?.id,
                       name: "Tantrapex Training",
                       description: checkoutPlan.name,
-                      image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=150",
+                      image: "https://res.cloudinary.com/dhy9pmo8s/image/upload/v1783025553/Untitled_design_3_hez3tf.png",
                       handler: async function (response: any) {
                         const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
                         const rzpReceipt = {
