@@ -197,6 +197,23 @@ export default function AdminPanel({
   const [isRunningAdminTestPayment, setIsRunningAdminTestPayment] = useState(false);
   const [adminTestPaymentStatus, setAdminTestPaymentStatus] = useState<{ type: 'success' | 'error' | null, message: string | null }>({ type: null, message: null });
 
+  const parseJsonResponse = async (response: Response) => {
+    const rawText = await response.text();
+    if (!rawText) {
+      return { success: false, error: 'Server returned an empty response.' };
+    }
+
+    try {
+      return JSON.parse(rawText);
+    } catch (err) {
+      console.error('Failed to parse server response:', rawText.slice(0, 500));
+      return {
+        success: false,
+        error: 'The server returned an invalid response. Please verify Razorpay and SMTP configuration.'
+      };
+    }
+  };
+
   const handleAdminTestPayment = async () => {
     if (!settings.email) {
       triggerToast('Please set the admin email in Global Settings first.');
@@ -216,7 +233,7 @@ export default function AdminPanel({
         })
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Test payment could not be completed.');
       }
