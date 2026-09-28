@@ -250,8 +250,7 @@ export default function AdminAboutPage({
                                         const reader = new FileReader();
                                         reader.onload = async () => {
                                           const dataUrl = String(reader.result || '');
-                                          // Try uploading to serverless endpoint which pushes to Cloudinary.
-                                          // If the endpoint is not available (404) or upload fails, fall back to using the data URL locally.
+                                          // Upload to Cloudinary via the server endpoint only; do not fallback to local data URLs.
                                           try {
                                             const resp = await fetch('/api/upload-image', {
                                               method: 'POST',
@@ -259,34 +258,24 @@ export default function AdminAboutPage({
                                               body: JSON.stringify({ data: dataUrl, folder: 'Tantrapex' })
                                             });
 
-                                            if (resp.ok) {
-                                              let json: any;
-                                              try {
-                                                json = await resp.json();
-                                              } catch (e) {
-                                                json = null;
-                                              }
-
-                                              if (json && json.success && json.url) {
-                                                const name = f.name;
-                                                const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
-                                                if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
-                                                onEditField(activeSection.id, `content.${key}`, newItem.url);
-                                                return;
-                                              }
+                                            if (!resp.ok) {
+                                              const json = await resp.json().catch(() => null);
+                                              throw new Error(json?.message || 'Cloudinary upload failed.');
                                             }
 
-                                            // Fallback: use data URL directly when upload endpoint isn't present or failed
-                                            const name = f.name;
-                                            const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
-                                            if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
-                                            onEditField(activeSection.id, `content.${key}`, fallbackItem.url);
+                                            const json = await resp.json();
+                                            if (json && json.success && json.url) {
+                                              const name = f.name;
+                                              const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                              if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
+                                              onEditField(activeSection.id, `content.${key}`, newItem.url);
+                                              return;
+                                            }
+
+                                            throw new Error('Upload did not return a Cloudinary URL.');
                                           } catch (err) {
-                                            console.error('Upload attempt failed, falling back to data URL:', err);
-                                            const name = f.name;
-                                            const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
-                                            if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
-                                            onEditField(activeSection.id, `content.${key}`, fallbackItem.url);
+                                            console.error('Upload attempt failed:', err);
+                                            window.alert('Image upload failed. Please check Cloudinary configuration and try again.');
                                           }
                                         };
                                         reader.readAsDataURL(f);
@@ -355,34 +344,24 @@ export default function AdminAboutPage({
                                                             body: JSON.stringify({ data: dataUrl, folder: 'Tantrapex' })
                                                           });
 
-                                                          if (resp.ok) {
-                                                            let json: any;
-                                                            try {
-                                                              json = await resp.json();
-                                                            } catch (e) {
-                                                              json = null;
-                                                            }
-
-                                                            if (json && json.success && json.url) {
-                                                              const name = f.name;
-                                                              const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
-                                                              if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
-                                                              onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, newItem.url);
-                                                              return;
-                                                            }
+                                                          if (!resp.ok) {
+                                                            const json = await resp.json().catch(() => null);
+                                                            throw new Error(json?.message || 'Cloudinary upload failed.');
                                                           }
 
-                                                          // Fallback to data URL
-                                                          const name = f.name;
-                                                          const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
-                                                          if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
-                                                          onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, fallbackItem.url);
+                                                          const json = await resp.json();
+                                                          if (json && json.success && json.url) {
+                                                            const name = f.name;
+                                                            const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                                            if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
+                                                            onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, newItem.url);
+                                                            return;
+                                                          }
+
+                                                          throw new Error('Upload did not return a Cloudinary URL.');
                                                         } catch (err) {
-                                                          console.error('Upload attempt failed, falling back to data URL:', err);
-                                                          const name = f.name;
-                                                          const fallbackItem: MediaItem = { id: `m-${Date.now()}`, name, url: dataUrl, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
-                                                          if (setMedia) setMedia(prev => [fallbackItem, ...(prev || [])]);
-                                                          onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, fallbackItem.url);
+                                                          console.error('Upload attempt failed:', err);
+                                                          window.alert('Image upload failed. Please check Cloudinary configuration and try again.');
                                                         }
                                                       };
                                                       reader.readAsDataURL(f);

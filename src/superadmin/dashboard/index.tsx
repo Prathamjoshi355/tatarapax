@@ -16,6 +16,7 @@ interface SuperAdminDashboardProps {
   mongoDbStatus: 'connected' | 'disconnected' | 'loading';
   mongoDbError: string | null;
   onOpenGlobalAdmin?: () => void;
+  onOpenPoliciesAdmin?: () => void;
 }
 
 export default function SuperAdminDashboard({
@@ -28,7 +29,8 @@ export default function SuperAdminDashboard({
   leadsCount,
   mongoDbStatus,
   mongoDbError,
-  onOpenGlobalAdmin
+  onOpenGlobalAdmin,
+  onOpenPoliciesAdmin
 }: SuperAdminDashboardProps) {
   // Determine if it looks like an IP Whitelist / SSL Alert 80 failure
   const isAuthError = mongoDbError && (
@@ -253,7 +255,7 @@ export default function SuperAdminDashboard({
             <div className="flex flex-col">
               <h3 className="text-base font-extrabold text-white">Global Collections CMS & CRM Hub</h3>
               <p className="text-xs text-slate-400 mt-0.5 max-w-2xl leading-relaxed">
-                Add, edit and manage non-page datasets synced with MongoDB Atlas. This includes Placed Students CRM, Hiring Partners brand links, Course Syllabuses, Blog Articles, and Inbound Student Leads.
+                Add, edit and manage non-page datasets synced with MongoDB Atlas. This includes Legal Policies & Terms, Placed Students CRM, Hiring Partners brand links, Course Syllabuses, Blog Articles, and Inbound Student Leads.
               </p>
             </div>
           </div>
@@ -263,7 +265,7 @@ export default function SuperAdminDashboard({
               className="w-full md:w-auto py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg hover:shadow-emerald-500/10 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
             >
               <ShieldCheck className="h-4 w-4" />
-              <span>Launch CRM Console</span>
+              <span>Launch CRM & Policies Console</span>
             </button>
           )}
         </div>
@@ -281,9 +283,50 @@ export default function SuperAdminDashboard({
 
         {/* Dynamic Pages Listing Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Legal Policies & Terms Page Card */}
+          <div className="bg-gradient-to-br from-slate-900 to-blue-950/40 border-2 border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-6 shadow-xl flex flex-col justify-between gap-6 transition-all group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all pointer-events-none" />
+
+            <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-lg text-white group-hover:text-emerald-400 transition-colors">
+                    Legal Policies & Compliance
+                  </h3>
+                  <span className="bg-emerald-500/15 text-emerald-400 text-[8px] px-1.5 py-0.5 rounded font-mono font-bold uppercase tracking-wider border border-emerald-500/30">
+                    4 Documents
+                  </span>
+                </div>
+                <span className="text-xs font-mono text-slate-400">Routes: #/privacy, #/terms, #/disclaimer, #/refund-policy</span>
+                <p className="text-xs text-slate-300 leading-relaxed mt-1">
+                  Full editor for Privacy Policy, Terms of Service, Disclaimer, and Cancellation & Refund Policy clauses, fees, and contact details.
+                </p>
+              </div>
+            </div>
+
+            <div className="h-px bg-slate-800" />
+
+            <div className="flex items-center gap-3 w-full">
+              <button
+                onClick={() => {
+                  if (onOpenPoliciesAdmin) {
+                    onOpenPoliciesAdmin();
+                  } else {
+                    window.location.hash = '#/superadmin/policies';
+                  }
+                }}
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-wider rounded-xl text-xs transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                <span>Open Legal Policies Editor</span>
+              </button>
+            </div>
+          </div>
+
           {pages.map((p) => {
             // Check if page has special support for admin/visual routing (Home, About, Services, Blog, Contact, Colleges)
-            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact', 'college-partnership'].includes(p.id);
+            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact', 'college-partnership', 'pricing'].includes(p.id);
 
             return (
               <div 

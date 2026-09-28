@@ -29,6 +29,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ success: false, message: 'Missing image data' });
     }
 
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error('Cloudinary environment variables are missing.');
+      return res.status(500).json({
+        success: false,
+        message: 'Cloudinary is not configured on this server. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.'
+      });
+    }
+
     const cl = await ensureCloudinary();
     const result = await cl.uploader.upload(data, {
       folder,

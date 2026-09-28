@@ -43,6 +43,36 @@ export interface MenuItem {
   isVisible: boolean;
 }
 
+export interface PolicySectionItem {
+  id: string;
+  title: string;
+  content: string;
+  bullets?: string[];
+  callout?: {
+    type: 'info' | 'warning' | 'danger' | 'success';
+    text: string;
+  };
+}
+
+export interface PolicyDocument {
+  id: 'privacy' | 'terms' | 'disclaimer' | 'refund';
+  title: string;
+  companyName: string;
+  introText: string;
+  lastUpdated?: string;
+  contactEmail1?: string;
+  contactEmail2?: string;
+  contactAddress?: string;
+  sections: PolicySectionItem[];
+}
+
+export interface PoliciesConfig {
+  privacy: PolicyDocument;
+  terms: PolicyDocument;
+  disclaimer: PolicyDocument;
+  refund: PolicyDocument;
+}
+
 export interface GlobalSettings {
   logoText: string;
   logoSubText: string;
@@ -67,6 +97,7 @@ export interface GlobalSettings {
   headerCtaLink?: string;
   googleRatingValue?: string;
   googleRatingTitle?: string;
+  policiesConfig?: PoliciesConfig;
 }
 
 export interface MediaItem {
@@ -130,6 +161,8 @@ export interface PlacedStudent {
   year: string;
   company: string;
   packageLpa: string;
+  showOnHomepage?: boolean;
+  testimonialText?: string;
 }
 
 export interface HiringPartner {

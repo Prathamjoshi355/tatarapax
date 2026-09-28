@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CMSPage, CMSSection, GlobalSettings } from '../../../types';
+import { CMSPage, CMSSection, GlobalSettings, MediaItem } from '../../../types';
 import { 
   FileText, Layout, Settings, Save, RefreshCw, Eye, MoveUp, MoveDown, Plus, Trash2, Edit 
 } from 'lucide-react';
@@ -11,6 +11,8 @@ interface AdminHomePageProps {
   onEditField: (sectionId: string, fieldPath: string, value: any) => void;
   onMoveSection: (direction: 'up' | 'down', sectionId: string) => void;
   onDeleteSection: (sectionId: string) => void;
+  media?: MediaItem[];
+  setMedia?: React.Dispatch<React.SetStateAction<MediaItem[]>>;
 }
 
 export default function AdminHomePage({
@@ -18,7 +20,9 @@ export default function AdminHomePage({
   setPages,
   onEditField,
   onMoveSection,
-  onDeleteSection
+  onDeleteSection,
+  media,
+  setMedia
 }: AdminHomePageProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(page.sections[0]?.id || null);
   const [seoTitle, setSeoTitle] = useState(page.seo.title);
@@ -244,10 +248,18 @@ export default function AdminHomePage({
                             </div>
                             <div className="flex flex-col gap-1.5 col-span-2">
                               <UniversalImageUploader 
-                                label="Hero Background Image (Cover)"
+                                label="Hero Background Image (Desktop)"
                                 value={activeSection.content.heroImage || ''} 
                                 onChange={(val) => onEditField(activeSection.id, 'content.heroImage', val)} 
                               />
+                            </div>
+                            <div className="flex flex-col gap-1.5 col-span-2">
+                              <UniversalImageUploader 
+                                label="Hero Background Image (Mobile)"
+                                value={activeSection.content.mobileHeroImage || ''} 
+                                onChange={(val) => onEditField(activeSection.id, 'content.mobileHeroImage', val)} 
+                              />
+                              <p className="text-[10px] text-slate-500">Leave empty to use the desktop hero image on mobile.</p>
                             </div>
                             <div className="flex flex-col gap-1.5">
                               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Primary Button Text</label>
@@ -558,8 +570,51 @@ export default function AdminHomePage({
                                 onEditField(activeSection.id, 'content.services', list);
                               };
 
+                              const handleMoveUp = () => {
+                                if (idx === 0) return;
+                                const list = [...activeSection.content.services];
+                                const temp = list[idx - 1];
+                                list[idx - 1] = list[idx];
+                                list[idx] = temp;
+                                onEditField(activeSection.id, 'content.services', list);
+                              };
+                              const handleMoveDown = () => {
+                                if (idx === activeSection.content.services.length - 1) return;
+                                const list = [...activeSection.content.services];
+                                const temp = list[idx + 1];
+                                list[idx + 1] = list[idx];
+                                list[idx] = temp;
+                                onEditField(activeSection.id, 'content.services', list);
+                              };
+
                               return (
                                 <div key={serv.id || idx} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between">
+                                  <div className="flex md:flex-col items-center gap-1 shrink-0">
+                                    <span className="text-[10px] font-black text-blue-400 bg-blue-950 px-1.5 py-0.5 rounded border border-blue-800/50">
+                                      #{idx + 1}
+                                    </span>
+                                    <div className="flex md:flex-col gap-1">
+                                      <button
+                                        type="button"
+                                        disabled={idx === 0}
+                                        onClick={handleMoveUp}
+                                        className="p-1 bg-slate-800 hover:bg-blue-600 disabled:opacity-30 disabled:hover:bg-slate-800 text-slate-200 rounded transition-colors"
+                                        title="Move Up"
+                                      >
+                                        <MoveUp className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={idx === activeSection.content.services.length - 1}
+                                        onClick={handleMoveDown}
+                                        className="p-1 bg-slate-800 hover:bg-blue-600 disabled:opacity-30 disabled:hover:bg-slate-800 text-slate-200 rounded transition-colors"
+                                        title="Move Down"
+                                      >
+                                        <MoveDown className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-3xl">
                                     <div className="flex flex-col gap-1">
                                       <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Program Title</span>
@@ -750,25 +805,601 @@ export default function AdminHomePage({
                         </div>
                       )}
 
+                      {/* TIMELINE STEPS MANAGER */}
+                      {activeSection.type === 'timeline' && (
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Journey Steps (Timeline)</h4>
+                            <button 
+                              onClick={() => {
+                                const list = [...(activeSection.content.steps || [])];
+                                const newItem = {
+                                  id: `step-${Date.now()}`,
+                                  num: String(list.length + 1),
+                                  label: "New Step Title",
+                                  desc: "Describe what happens in this step.",
+                                  icon: "Edit3"
+                                };
+                                onEditField(activeSection.id, 'content.steps', [...list, newItem]);
+                              }}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[9px] uppercase tracking-wider flex items-center gap-1 transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                              <span>Add New Step</span>
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col gap-3">
+                            {(activeSection.content.steps || []).map((step: any, idx: number) => {
+                              const handleField = (f: string, v: any) => {
+                                const list = [...activeSection.content.steps];
+                                list[idx] = { ...list[idx], [f]: v };
+                                onEditField(activeSection.id, 'content.steps', list);
+                              };
+                              const handleMove = (direction: 'up' | 'down') => {
+                                const list = [...activeSection.content.steps];
+                                if (direction === 'up' && idx > 0) {
+                                  const temp = list[idx];
+                                  list[idx] = list[idx - 1];
+                                  list[idx - 1] = temp;
+                                } else if (direction === 'down' && idx < list.length - 1) {
+                                  const temp = list[idx];
+                                  list[idx] = list[idx + 1];
+                                  list[idx + 1] = temp;
+                                }
+                                onEditField(activeSection.id, 'content.steps', list.map((item, index) => ({ ...item, num: String(index + 1) })));
+                              };
+                              const handleDelete = () => {
+                                const list = [...activeSection.content.steps];
+                                list.splice(idx, 1);
+                                onEditField(activeSection.id, 'content.steps', list.map((item, index) => ({ ...item, num: String(index + 1) })));
+                              };
+                              const handleDuplicate = () => {
+                                const list = [...activeSection.content.steps];
+                                const dup = { ...step, id: `step-${Date.now()}`, label: `${step.label} (Copy)`, num: String(list.length + 1) };
+                                onEditField(activeSection.id, 'content.steps', [...list, dup]);
+                              };
+
+                              return (
+                                <div key={step.id || idx} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-3xl font-sans">
+                                    <div className="flex flex-col gap-1 col-span-1">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Step Number / Label</span>
+                                      <input 
+                                        type="text" 
+                                        value={step.num || ''} 
+                                        onChange={(e) => handleField('num', e.target.value)}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1 col-span-1">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Step Title</span>
+                                      <input 
+                                        type="text" 
+                                        value={step.label || ''} 
+                                        onChange={(e) => handleField('label', e.target.value)}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1 col-span-1">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Icon (Lucide name)</span>
+                                      <input 
+                                        type="text" 
+                                        value={step.icon || ''} 
+                                        onChange={(e) => handleField('icon', e.target.value)}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                        placeholder="Edit3, Play, BookOpen..."
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1 col-span-3">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Description</span>
+                                      <textarea 
+                                        value={step.desc || ''} 
+                                        onChange={(e) => handleField('desc', e.target.value)}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white min-h-[44px]"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0 mt-4 md:mt-0">
+                                    <button onClick={() => handleMove('up')} disabled={idx === 0} className="p-1.5 bg-slate-800 hover:bg-slate-750 rounded text-slate-300 disabled:opacity-30"><MoveUp className="h-3 w-3" /></button>
+                                    <button onClick={() => handleMove('down')} disabled={idx === (activeSection.content.steps || []).length - 1} className="p-1.5 bg-slate-800 hover:bg-slate-750 rounded text-slate-300 disabled:opacity-30"><MoveDown className="h-3 w-3" /></button>
+                                    <button onClick={handleDuplicate} className="p-1.5 bg-slate-800 hover:bg-blue-900 rounded text-slate-300 hover:text-blue-200" title="Duplicate"><RefreshCw className="h-3 w-3" /></button>
+                                    <button onClick={handleDelete} className="p-1.5 bg-slate-800 hover:bg-rose-950 rounded text-slate-300 hover:text-rose-400" title="Delete"><Trash2 className="h-3 w-3" /></button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PRICING HERO SECTION EDITOR */}
+                      {activeSection.type === 'pricing-hero' && (
+                        <div className="flex flex-col gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl font-sans text-left">
+                          <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Pricing Hero Settings</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Hero Title</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.title || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.title', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Hero Tagline</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.tagline || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.tagline', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1 col-span-2">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Hero Subtitle</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.subtitle || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.subtitle', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Desktop Background Image (Laptop/Wide)</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.desktopBg || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.desktopBg', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                placeholder="Paste unsplash URL"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Mobile Background Image (Phone)</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.mobileBg || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.mobileBg', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                placeholder="Paste unsplash URL"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1 col-span-2">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Text Overlay Cover Color & Opacity (CSS rgba style)</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.overlayColor || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.overlayColor', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                placeholder="e.g. rgba(7, 27, 77, 0.75)"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PRICING PLANS SECTION EDITOR */}
+                      {activeSection.type === 'pricing-plans' && (
+                        <div className="flex flex-col gap-4 font-sans text-left">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Pricing Plans & Packages</h4>
+                            <button 
+                              onClick={() => {
+                                const list = [...(activeSection.content.plans || [])];
+                                const newItem = {
+                                  id: `plan-${Date.now()}`,
+                                  name: "NEW BOOTCAMP PLAN",
+                                  subtitle: "Full corporate readiness training",
+                                  price: 4500,
+                                  duration: "3 Months",
+                                  isMostPopular: false,
+                                  isLocked: false,
+                                  features: ["10+ Live Aptitude Sessions", "ATS Resume Audit", "Weekly Coding Tests"]
+                                };
+                                onEditField(activeSection.id, 'content.plans', [...list, newItem]);
+                              }}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[9px] uppercase tracking-wider flex items-center gap-1 transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                              <span>Add New Plan</span>
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col gap-4">
+                            {(activeSection.content.plans || []).map((plan: any, idx: number) => {
+                              const handleField = (f: string, v: any) => {
+                                const list = [...activeSection.content.plans];
+                                list[idx] = { ...list[idx], [f]: v };
+                                onEditField(activeSection.id, 'content.plans', list);
+                              };
+                              const handlePopularToggle = (checked: boolean) => {
+                                let list = [...activeSection.content.plans];
+                                if (checked) {
+                                  // Set all other plans to false, only this one true
+                                  list = list.map((p, pIdx) => ({
+                                    ...p,
+                                    isMostPopular: pIdx === idx
+                                  }));
+                                } else {
+                                  list[idx] = { ...list[idx], isMostPopular: false };
+                                }
+                                onEditField(activeSection.id, 'content.plans', list);
+                              };
+                              const handleDelete = () => {
+                                const list = [...activeSection.content.plans];
+                                list.splice(idx, 1);
+                                onEditField(activeSection.id, 'content.plans', list);
+                              };
+                              const handleAddFeature = () => {
+                                const features = [...(plan.features || [])];
+                                features.push("New Feature");
+                                handleField('features', features);
+                              };
+                              const handleFeatureChange = (fIdx: number, val: string) => {
+                                const features = [...(plan.features || [])];
+                                features[fIdx] = val;
+                                handleField('features', features);
+                              };
+                              const handleDeleteFeature = (fIdx: number) => {
+                                const features = [...(plan.features || [])];
+                                features.splice(fIdx, 1);
+                                handleField('features', features);
+                              };
+
+                              return (
+                                <div key={plan.id || idx} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col gap-4 text-left">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Plan Name</span>
+                                      <input 
+                                        type="text" 
+                                        value={plan.name || ''} 
+                                        onChange={(e) => handleField('name', e.target.value)}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Subtitle / Description</span>
+                                      <input 
+                                        type="text" 
+                                        value={plan.subtitle || ''} 
+                                        onChange={(e) => handleField('subtitle', e.target.value)}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Access Duration</span>
+                                      <input 
+                                        type="text" 
+                                        value={plan.duration || ''} 
+                                        onChange={(e) => handleField('duration', e.target.value)}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Price (INR ₹)</span>
+                                      <input 
+                                        type="number" 
+                                        value={plan.price || 0} 
+                                        onChange={(e) => handleField('price', Number(e.target.value))}
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      />
+                                    </div>
+
+                                    {/* Most Popular exclusive toggle */}
+                                    <div className="flex flex-col gap-1 justify-center">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Most Popular Badge</span>
+                                      <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                                        <input 
+                                          type="checkbox"
+                                          checked={!!plan.isMostPopular}
+                                          onChange={(e) => handlePopularToggle(e.target.checked)}
+                                          className="h-4 w-4 bg-slate-950 border-slate-800 rounded focus:ring-0"
+                                        />
+                                        <span className="text-xs text-slate-300 font-bold">Set as Most Popular</span>
+                                      </label>
+                                    </div>
+
+                                    {/* Lock Plan Toggle */}
+                                    <div className="flex flex-col gap-1 justify-center">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Lock Plan</span>
+                                      <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                                        <input 
+                                          type="checkbox"
+                                          checked={!!plan.isLocked}
+                                          onChange={(e) => handleField('isLocked', e.target.checked)}
+                                          className="h-4 w-4 bg-slate-950 border-slate-800 rounded focus:ring-0"
+                                        />
+                                        <span className="text-xs text-slate-300 font-bold">Lock Plan (Fade on Site & Show Locked Message)</span>
+                                      </label>
+                                    </div>
+
+                                    <div className="flex items-end justify-end">
+                                      <button 
+                                        onClick={handleDelete}
+                                        className="px-3 py-1.5 bg-rose-950 text-rose-400 rounded text-xs hover:bg-rose-900 transition-colors flex items-center gap-1"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                        <span>Delete Plan</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Features List Admin inside each Plan */}
+                                  <div className="border-t border-slate-800/60 pt-3 flex flex-col gap-2">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Plan Features (Included Bullet Items)</span>
+                                      <button 
+                                        onClick={handleAddFeature}
+                                        className="px-2 py-0.5 bg-slate-850 hover:bg-slate-800 text-slate-200 text-[9px] rounded flex items-center gap-0.5"
+                                      >
+                                        <Plus className="h-2.5 w-2.5" />
+                                        <span>Add Feature Item</span>
+                                      </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      {(plan.features || []).map((feat: string, fIdx: number) => (
+                                        <div key={fIdx} className="flex gap-1.5 items-center bg-slate-950 p-1.5 rounded border border-slate-850">
+                                          <input 
+                                            type="text" 
+                                            value={feat}
+                                            onChange={(e) => handleFeatureChange(fIdx, e.target.value)}
+                                            className="bg-transparent text-xs text-white focus:outline-none w-full"
+                                          />
+                                          <button 
+                                            onClick={() => handleDeleteFeature(fIdx)}
+                                            className="p-1 hover:text-rose-400 text-slate-500 shrink-0"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PRICING COMPARISON TABLE EDITOR */}
+                      {activeSection.type === 'pricing-comparison' && (
+                        <div className="flex flex-col gap-4 font-sans bg-slate-900 border border-slate-800 p-4 rounded-xl text-left">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Comparison Table Rows</h4>
+                            <button 
+                              onClick={() => {
+                                const list = [...(activeSection.content.features || [])];
+                                const newItem = { name: "New Comparative Feature", status: "checkmark" };
+                                onEditField(activeSection.id, 'content.features', [...list, newItem]);
+                              }}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[9px] uppercase tracking-wider flex items-center gap-1 transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                              <span>Add Row</span>
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col gap-2.5">
+                            {(activeSection.content.features || []).map((row: any, rIdx: number) => {
+                              const handleField = (f: string, v: any) => {
+                                const list = [...activeSection.content.features];
+                                list[rIdx] = { ...list[rIdx], [f]: v };
+                                onEditField(activeSection.id, 'content.features', list);
+                              };
+                              const handleDelete = () => {
+                                const list = [...activeSection.content.features];
+                                list.splice(rIdx, 1);
+                                onEditField(activeSection.id, 'content.features', list);
+                              };
+
+                              return (
+                                <div key={rIdx} className="flex gap-3 items-center bg-slate-950 p-2 rounded border border-slate-850 justify-between">
+                                  <div className="flex-1">
+                                    <input 
+                                      type="text" 
+                                      value={row.name}
+                                      onChange={(e) => handleField('name', e.target.value)}
+                                      className="bg-transparent text-xs text-white focus:outline-none w-full"
+                                    />
+                                  </div>
+                                  <div className="flex gap-2 items-center">
+                                    <select 
+                                      value={row.status}
+                                      onChange={(e) => handleField('status', e.target.value)}
+                                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                                    >
+                                      <option value="checkmark">Checkmark (Yes)</option>
+                                      <option value="dash">Dash (No)</option>
+                                      <option value="Advanced">"Advanced" tag</option>
+                                      <option value="Interactive">"Interactive" tag</option>
+                                    </select>
+                                    <button 
+                                      onClick={handleDelete}
+                                      className="p-1 hover:text-rose-400 text-slate-500"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PRICING ASSESSMENT INTERACTIVE EDITOR */}
+                      {activeSection.type === 'pricing-assessment' && (
+                        <div className="flex flex-col gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl font-sans text-left">
+                          <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Career Assessment Config</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Section Title</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.title || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.title', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Button CTA Text</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.btnText || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.btnText', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1 col-span-2">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Section Subtitle</span>
+                              <textarea 
+                                value={activeSection.content.subtitle || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.subtitle', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white min-h-[44px]"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1 col-span-2">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Banner Image URL</span>
+                              <input 
+                                type="text" 
+                                value={activeSection.content.bannerImage || ''} 
+                                onChange={(e) => onEditField(activeSection.id, 'content.bannerImage', e.target.value)}
+                                className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PRICING DYNAMIC IMPACT STATS EDITOR */}
+                      {activeSection.type === 'pricing-stats' && (
+                        <div className="flex flex-col gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl font-sans text-left">
+                          <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Dynamic Stats Indicators</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {(activeSection.content.stats || []).map((stat: any, sIdx: number) => {
+                              const handleStatField = (f: string, val: string) => {
+                                const list = [...activeSection.content.stats];
+                                list[sIdx] = { ...list[sIdx], [f]: val };
+                                onEditField(activeSection.id, 'content.stats', list);
+                              };
+                              return (
+                                <div key={stat.id || sIdx} className="flex flex-col gap-2 p-3 bg-slate-950 rounded border border-slate-850 text-left">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-[8px] font-bold text-slate-500 uppercase">Stat Value</span>
+                                    <input 
+                                      type="text" 
+                                      value={stat.count || ''} 
+                                      onChange={(e) => handleStatField('count', e.target.value)}
+                                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-[8px] font-bold text-slate-500 uppercase">Label Name</span>
+                                    <input 
+                                      type="text" 
+                                      value={stat.label || ''} 
+                                      onChange={(e) => handleStatField('label', e.target.value)}
+                                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Fallback simple properties reader */}
-                      {['success-stories', 'courses-home', 'workshops-home', 'blogs-home', 'cta-banner', 'stories-and-partners', 'timeline'].includes(activeSection.type) && (
+                      {!['services-home', 'impact', 'testimonials', 'timeline', 'pricing-hero', 'pricing-plans', 'pricing-comparison', 'pricing-assessment', 'pricing-stats'].includes(activeSection.type) && (
                         <div className="flex flex-col gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl">
                           <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Layout Block Configuration</h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {Object.entries(activeSection.content).map(([key, val]) => {
+                              // Simple string fields (including single-image fields)
                               if (typeof val === 'string') {
+                                const lower = key.toLowerCase();
+                                const isImageKey = lower.includes('image') || lower.includes('img') || lower.includes('photo');
+
+                                if (isImageKey) {
+                                  return (
+                                    <div key={key} className="flex flex-col gap-1.5 col-span-1 md:col-span-2">
+                                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{key.replace(/([A-Z])/g, ' $1')}</span>
+                                      <input
+                                        type="text"
+                                        value={val}
+                                        onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)}
+                                        placeholder="Paste image URL here"
+                                        className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      />
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <label className="text-xs text-slate-400">Upload</label>
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          onChange={(e) => {
+                                            const f = e.target.files?.[0];
+                                            if (!f) return;
+                                            const reader = new FileReader();
+                                            reader.onload = async () => {
+                                              const dataUrl = String(reader.result || '');
+                                              try {
+                                                const resp = await fetch('/api/upload-image', {
+                                                  method: 'POST',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({ data: dataUrl, folder: 'Tantrapex' })
+                                                });
+
+                                                if (!resp.ok) {
+                                                  const json = await resp.json().catch(() => null);
+                                                  throw new Error(json?.message || 'Cloudinary upload failed.');
+                                                }
+
+                                                const json = await resp.json();
+                                                if (json && json.success && json.url) {
+                                                  const name = f.name;
+                                                  const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                                  if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
+                                                  onEditField(activeSection.id, `content.${key}`, newItem.url);
+                                                  return;
+                                                }
+
+                                                throw new Error('Upload did not return a Cloudinary URL.');
+                                              } catch (err) {
+                                                console.error('Upload attempt failed:', err);
+                                                window.alert('Image upload failed. Please check Cloudinary configuration and try again.');
+                                              }
+                                            };
+                                            reader.readAsDataURL(f);
+                                          }}
+                                          className="text-xs text-slate-400"
+                                        />
+                                      </div>
+                                      {val && (
+                                        <div className="mt-2">
+                                          <img src={val} alt={key} className="w-32 h-20 object-cover rounded-md border border-slate-800" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+
                                 return (
-                                  <div key={key} className="flex flex-col gap-1">
+                                  <div key={key} className="flex flex-col gap-1.5 col-span-1 md:col-span-2">
                                     <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{key.replace(/([A-Z])/g, ' $1')}</span>
-                                    <input 
-                                      type="text" 
+                                    <textarea 
                                       value={val} 
-                                      onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)}
-                                      className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white"
+                                      onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)} 
+                                      className="bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 text-xs text-white min-h-[50px] font-sans"
                                     />
                                   </div>
                                 );
                               }
+
                               if (typeof val === 'number') {
                                 return (
                                   <div key={key} className="flex flex-col gap-1">
@@ -782,6 +1413,117 @@ export default function AdminHomePage({
                                   </div>
                                 );
                               }
+
+                              if (typeof val === 'boolean') {
+                                return (
+                                  <div key={key} className="flex items-center gap-2 mt-4 col-span-1">
+                                    <input
+                                      type="checkbox"
+                                      id={`checkbox-${key}`}
+                                      checked={val}
+                                      onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.checked)}
+                                      className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0 h-4 w-4"
+                                    />
+                                    <label htmlFor={`checkbox-${key}`} className="text-[10px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer">
+                                      {key.replace(/([A-Z])/g, ' $1')}
+                                    </label>
+                                  </div>
+                                );
+                              }
+
+                              // Arrays of objects (e.g., stats, cards)
+                              if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+                                return (
+                                  <div key={key} className="col-span-1 md:col-span-2">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">{key.replace(/([A-Z])/g, ' $1')}</span>
+                                    <div className="flex flex-col gap-3">
+                                      {val.map((item: any, idx: number) => (
+                                        <div key={`${item.id || 'item'}-${idx}`} className="bg-slate-950 p-3 rounded-md border border-slate-850">
+                                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                            {Object.entries(item).map(([subKey, subVal]) => {
+                                              if (typeof subVal === 'string') {
+                                                const subLower = subKey.toLowerCase();
+                                                const isImg = subLower.includes('image') || subLower.includes('img') || subLower.includes('photo') || subLower === 'image' || subLower === 'avatar';
+                                                if (isImg) {
+                                                  return (
+                                                    <div key={subKey} className="flex flex-col gap-1">
+                                                      <label className="text-[9px] font-semibold text-slate-400">{subKey.replace(/([A-Z])/g, ' $1')}</label>
+                                                      <input
+                                                        type="text"
+                                                        value={subVal}
+                                                        onChange={(e) => onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, e.target.value)}
+                                                        placeholder="Paste image URL here"
+                                                        className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                                                      />
+                                                      <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                          const f = e.target.files?.[0];
+                                                          if (!f) return;
+                                                          const reader = new FileReader();
+                                                          reader.onload = async () => {
+                                                            const dataUrl = String(reader.result || '');
+                                                            try {
+                                                              const resp = await fetch('/api/upload-image', {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({ data: dataUrl, folder: 'Tantrapex' })
+                                                              });
+
+                                                              if (!resp.ok) {
+                                                                const json = await resp.json().catch(() => null);
+                                                                throw new Error(json?.message || 'Cloudinary upload failed.');
+                                                              }
+
+                                                              const json = await resp.json();
+                                                              if (json && json.success && json.url) {
+                                                                const name = f.name;
+                                                                const newItem: MediaItem = { id: `m-${Date.now()}`, name, url: json.url, type: 'image', size: `${Math.round(f.size/1024)}KB`, folder: 'Tantrapex', altText: name };
+                                                                if (setMedia) setMedia(prev => [newItem, ...(prev || [])]);
+                                                                onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, newItem.url);
+                                                                return;
+                                                              }
+
+                                                              throw new Error('Upload did not return a Cloudinary URL.');
+                                                            } catch (err) {
+                                                              console.error('Upload attempt failed:', err);
+                                                              window.alert('Image upload failed. Please check Cloudinary configuration and try again.');
+                                                            }
+                                                          };
+                                                          reader.readAsDataURL(f);
+                                                        }}
+                                                        className="text-xs text-slate-400 mt-1"
+                                                      />
+                                                      {subVal && (
+                                                        <img src={subVal} alt={subKey} className="w-24 h-16 object-cover rounded-md mt-2 border border-slate-800" />
+                                                      )}
+                                                    </div>
+                                                  );
+                                                }
+
+                                                return (
+                                                  <div key={subKey} className="flex flex-col gap-1">
+                                                    <label className="text-[9px] font-semibold text-slate-400">{subKey.replace(/([A-Z])/g, ' $1')}</label>
+                                                    <input
+                                                      type="text"
+                                                      value={subVal}
+                                                      onChange={(e) => onEditField(activeSection.id, `content.${key}.${idx}.${subKey}`, e.target.value)}
+                                                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                                                    />
+                                                  </div>
+                                                );
+                                              }
+                                              return null;
+                                            })}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
                               return null;
                             })}
                           </div>

@@ -18,6 +18,15 @@ export default function Header({
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const navigateToPage = (pageId: string) => {
+    const nextHash = pageId === 'home' ? '#/' : `#/${pageId}`;
+    if (window.location.hash === nextHash) {
+      window.dispatchEvent(new Event('hashchange'));
+      return;
+    }
+    window.location.hash = nextHash;
+  };
   
   // Resolve and sort menu items
   const menuItems = settings.menuItems
@@ -56,11 +65,11 @@ export default function Header({
         {/* Logo Brand Block */}
         <div
           className="flex items-center gap-2.5 cursor-pointer group shrink-0"
-          onClick={() => setCurrentPageId('home')}
+          onClick={() => navigateToPage('home')}
           id="nav-logo"
         >
          <div className="h-9 w-9 rounded-lg flex items-center justify-center font-display font-black text-lg shadow-md border bg-white border-white text-[#071B4D]">
-            TP
+         <img src="https://res.cloudinary.com/dhy9pmo8s/image/upload/v1783025553/Untitled_design_3_hez3tf.png" alt="Logo" className="h-full w-full object-cover rounded-lg border border-white " />
           </div>
           <div className="flex flex-col">
             <span className="font-display font-extrabold text-sm md:text-base xl:text-lg tracking-tight leading-none uppercase text-white">
@@ -80,7 +89,7 @@ export default function Header({
               <button
                 key={item.id}
                 id={`nav-item-${item.pageId}`}
-                onClick={() => setCurrentPageId(item.pageId)}
+                onClick={() => navigateToPage(item.pageId)}
                 className={`px-1.5 xl:px-3 py-1.5 xl:py-2 rounded-lg font-sans text-[10px] xl:text-[11px] 2xl:text-xs font-semibold uppercase tracking-wider transition-all duration-150 whitespace-nowrap shrink-0 ${
                   isActive
                     ? "text-[#F7C400] bg-white/10 border-b-2 border-[#F7C400]"
@@ -128,7 +137,7 @@ export default function Header({
                             key={item.id}
                             id={`nav-item-${item.pageId}`}
                             onClick={() => {
-                              setCurrentPageId(item.pageId);
+                              navigateToPage(item.pageId);
                               setDropdownOpen(false);
                             }}
                             className={`w-full text-left px-3.5 py-2 rounded-lg font-sans text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
@@ -154,7 +163,7 @@ export default function Header({
           {/* Dynamic CTA button */}
           <button
             id="nav-cta"
-            onClick={() => setCurrentPageId(settings.headerCtaLink || 'contact')}
+            onClick={() => navigateToPage(settings.headerCtaLink || 'contact')}
             className="hidden sm:flex items-center gap-1.5 px-3 xl:px-5 py-2 xl:py-2.5 bg-[#F7C400] text-[#071B4D] font-sans font-extrabold text-[10px] xl:text-xs uppercase tracking-wider rounded-lg transition-all duration-150 hover:bg-[#e2b400] shadow-md hover:shadow-lg active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
           >
             <span>{settings.headerCtaText || "Enquire Now"}</span>
@@ -181,7 +190,7 @@ export default function Header({
               <button
                 key={item.id}
                 onClick={() => {
-                  setCurrentPageId(item.pageId);
+                  navigateToPage(item.pageId);
                   setMobileMenuOpen(false);
                 }}
                 className={`w-full text-left px-4 py-2.5 rounded-lg font-sans text-xs font-bold uppercase tracking-wide transition-all cursor-pointer ${
@@ -197,7 +206,7 @@ export default function Header({
           <div className="h-px bg-slate-100 my-2" />
           <button
             onClick={() => {
-              setCurrentPageId(settings.headerCtaLink || 'contact');
+              navigateToPage(settings.headerCtaLink || 'contact');
               setMobileMenuOpen(false);
             }}
             className="w-full py-3 bg-[#F7C400] text-[#071B4D] font-bold text-center rounded-lg text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow cursor-pointer"

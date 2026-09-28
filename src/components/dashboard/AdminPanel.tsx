@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CMSPage, GlobalSettings, MediaItem, BlogPost, PlacedStudent, HiringPartner, Course, Lead, Service 
 } from '../../types';
-import { UniversalImageUploader, UniversalImageUploaderLight } from './UniversalImageUploader';
+import { UniversalImageUploader, UniversalImageUploaderLight, UniversalMultiImageUploader } from './UniversalImageUploader';
 import { 
   LayoutDashboard, FileText, Users, Award, BookOpen, Newspaper, FormInput, Image, Settings, Briefcase,
   TrendingUp, HelpCircle, CheckCircle, Clock, Trash2, Plus, Edit, Download, Check, RefreshCw, X, LogOut,
-  GraduationCap, Megaphone, Calendar
+  GraduationCap, Megaphone, Calendar, Ticket, Mail, CreditCard, User, ShieldCheck
 } from 'lucide-react';
+import PoliciesAdminEditor from './PoliciesAdminEditor';
 
 interface AdminPanelProps {
   pages: CMSPage[];
@@ -52,6 +53,18 @@ export default function AdminPanel({
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('policies')) {
+        setActiveTab('policies-cms');
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
   // Interactive Form State Holders
   const [selectedStudent, setSelectedStudent] = useState<PlacedStudent | null>(null);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
@@ -60,8 +73,11 @@ export default function AdminPanel({
 
   // Form edit fields
   const [studentForm, setStudentForm] = useState<Omit<PlacedStudent, 'id'>>({
-    name: '', avatar: '', college: '', branch: '', year: '2024', company: '', packageLpa: ''
+    name: '', avatar: '', college: '', branch: '', year: String(new Date().getFullYear()), company: '', packageLpa: '', showOnHomepage: true
   });
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 2000 + 6 }, (_, idx) => String(2000 + idx));
 
   const [blogForm, setBlogForm] = useState<Omit<BlogPost, 'id' | 'date'>>({
     title: '', slug: '', category: 'Resume Tips', excerpt: '', content: '', image: '', readTime: '5 mins read', status: 'published'
@@ -102,13 +118,140 @@ export default function AdminPanel({
     date: '',
     location: '',
     image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=500',
-    status: 'upcoming'
+    status: 'upcoming',
+    isFree: true,
+    price: 0
   });
+
+  // Workshop Gallery State
+  const [newGalleryImageUrl, setNewGalleryImageUrl] = useState('');
 
   // Media Library states
   const [newMediaName, setNewMediaName] = useState('');
   const [newMediaUrl, setNewMediaUrl] = useState('');
   const [newMediaType, setNewMediaType] = useState<'image' | 'video' | 'pdf' | 'svg'>('image');
+
+  // Workshop registrations CRM states
+  const [regSearchQuery, setRegSearchQuery] = useState('');
+  const [regStatusFilter, setRegStatusFilter] = useState('all');
+  const [planSearchQuery, setPlanSearchQuery] = useState('');
+
+  // Admin password permanent update states
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [devMasterPassword, setDevMasterPassword] = useState('');
+  const [passwordUpdateStatus, setPasswordUpdateStatus] = useState<{ type: 'success' | 'error' | null, message: string | null }>({ type: null, message: null });
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const handleUpdateAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminPassword) {
+      setPasswordUpdateStatus({ type: 'error', message: 'New admin password cannot be empty.' });
+      return;
+    }
+    if (!devMasterPassword) {
+      setPasswordUpdateStatus({ type: 'error', message: 'Developer master password is required to authorize this change.' });
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    setPasswordUpdateStatus({ type: null, message: null });
+
+    try {
+      const response = await fetch('/api/update-admin-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newPassword: newAdminPassword,
+          developerMasterPassword: devMasterPassword
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Update local React state
+        const updatedSettings = { ...settings, adminPassword: newAdminPassword };
+        setSettings(updatedSettings);
+        // Sync with localStorage
+        localStorage.setItem('tpx_settings', JSON.stringify(updatedSettings));
+        
+        setPasswordUpdateStatus({ 
+          type: 'success', 
+          message: data.offline 
+            ? 'Password saved in local cache (Offline Mode). Connect MongoDB for permanent database storage.' 
+            : 'Admin password successfully updated and permanently saved on MongoDB database!' 
+        });
+        setNewAdminPassword('');
+        setDevMasterPassword('');
+      } else {
+        setPasswordUpdateStatus({ type: 'error', message: data.msg || 'Failed to update admin password.' });
+      }
+    } catch (err: any) {
+      console.error("Password update error:", err);
+      setPasswordUpdateStatus({ type: 'error', message: 'Network error or backend is not running.' });
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+  const [regWorkshopFilter, setRegWorkshopFilter] = useState('all');
+  const [selectedRegForTicket, setSelectedRegForTicket] = useState<any | null>(null);
+  const [regToast, setRegToast] = useState<string | null>(null);
+  const [isRunningAdminTestPayment, setIsRunningAdminTestPayment] = useState(false);
+  const [adminTestPaymentStatus, setAdminTestPaymentStatus] = useState<{ type: 'success' | 'error' | null, message: string | null }>({ type: null, message: null });
+
+  const handleAdminTestPayment = async () => {
+    if (!settings.email) {
+      triggerToast('Please set the admin email in Global Settings first.');
+      return;
+    }
+
+    setIsRunningAdminTestPayment(true);
+    setAdminTestPaymentStatus({ type: null, message: null });
+
+    try {
+      const response = await fetch('/api/admin/test-razorpay-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: settings.email,
+          amount: 1
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Test payment could not be completed.');
+      }
+
+      const currentPurchases = getPlanPurchases();
+      const paymentRecord = {
+        paymentId: data.paymentId || `pay_admin_test_${Date.now()}`,
+        orderId: data.orderId || `order_admin_test_${Date.now()}`,
+        date: new Date().toLocaleString('en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        }),
+        planName: 'Razorpay Test Payment',
+        amount: 1,
+        studentName: 'Admin Test',
+        studentEmail: settings.email,
+        studentPhone: 'N/A'
+      };
+
+      localStorage.setItem('tpx_plan_purchases', JSON.stringify([paymentRecord, ...currentPurchases]));
+      setAdminTestPaymentStatus({
+        type: 'success',
+        message: `₹1 test payment completed and email sent to ${settings.email}.`
+      });
+      triggerToast(`₹1 Razorpay test payment complete. Mail sent to ${settings.email}.`);
+    } catch (err: any) {
+      console.error('Admin test payment error:', err);
+      setAdminTestPaymentStatus({
+        type: 'error',
+        message: err.message || 'Something went wrong while processing the test payment.'
+      });
+      triggerToast('Razorpay test payment failed. Check the backend keys or SMTP config.');
+    } finally {
+      setIsRunningAdminTestPayment(false);
+    }
+  };
 
   // CSV Exporter Simulation
   const handleExportCSV = (type: string) => {
@@ -121,6 +264,169 @@ export default function AdminPanel({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Workshop Registrations loaders
+  const getWorkshopRegistrations = () => {
+    const raw = localStorage.getItem('tpx_workshop_registrations');
+    if (!raw) {
+      const mockRegs = [
+        {
+          id: "tpx-reg-101",
+          name: "Pratham Joshi",
+          email: "prathamjoshi355@gmail.com",
+          phone: "9876543210",
+          college: "LNCT Bhopal",
+          branch: "Computer Science",
+          year: "4th Year",
+          workshopId: "wk-1",
+          workshopTitle: "Resume Building Workshop",
+          isFree: true,
+          pricePaid: 0,
+          paymentStatus: "Confirmed",
+          transactionId: "TPX-FREE-987A",
+          registeredAt: "2026-07-05T08:12:34-07:00"
+        },
+        {
+          id: "tpx-reg-102",
+          name: "Rohan Sharma",
+          email: "rohan.sharma@gmail.com",
+          phone: "9123456789",
+          college: "VIT Bhopal",
+          branch: "Information Technology",
+          year: "3rd Year",
+          workshopId: "wk-2",
+          workshopTitle: "Interview Preparation Workshop",
+          isFree: false,
+          pricePaid: 199,
+          paymentStatus: "Paid",
+          transactionId: "pay_Pq7v1XyZ59s1",
+          registeredAt: "2026-07-04T14:45:00-07:00"
+        },
+        {
+          id: "tpx-reg-103",
+          name: "Priya Patel",
+          email: "priya.patel@gmail.com",
+          phone: "9988776655",
+          college: "SGSITS Indore",
+          branch: "Electronics & Communication",
+          year: "4th Year",
+          workshopId: "wk-2",
+          workshopTitle: "Interview Preparation Workshop",
+          isFree: false,
+          pricePaid: 199,
+          paymentStatus: "Paid",
+          transactionId: "pay_H8uW9KlM123",
+          registeredAt: "2026-07-03T11:20:15-07:00"
+        }
+      ];
+      localStorage.setItem('tpx_workshop_registrations', JSON.stringify(mockRegs));
+      return mockRegs;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return [];
+    }
+  };
+
+  // Plan Purchases loaders
+  const getPlanPurchases = () => {
+    const raw = localStorage.getItem('tpx_plan_purchases');
+    if (!raw) {
+      const mockPurchases = [
+        {
+          paymentId: "pay_TESTPLN101",
+          orderId: "order_TESTORD101",
+          date: "5 July 2026, 11:30 am",
+          planName: "Super Premium Plan",
+          amount: 2999,
+          studentName: "Pratham Joshi",
+          studentEmail: "prathamjoshi355@gmail.com",
+          studentPhone: "9876543210"
+        }
+      ];
+      localStorage.setItem('tpx_plan_purchases', JSON.stringify(mockPurchases));
+      return mockPurchases;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const getEmailLogs = () => {
+    const raw = localStorage.getItem('tpx_sent_emails');
+    if (!raw) {
+      const mockEmails = [
+        {
+          id: "mail-1",
+          recipientName: "Pratham Joshi",
+          recipientEmail: "prathamjoshi355@gmail.com",
+          subject: "Your Tantrapex Workshop Admit Card - Resume Building Workshop",
+          timestamp: "2026-07-05T08:12:35-07:00",
+          status: "Delivered",
+          bodyPreview: "Dear Pratham, Your registration for Resume Building Workshop is successful. Find your entrance admit card attached..."
+        },
+        {
+          id: "mail-2",
+          recipientName: "Rohan Sharma",
+          recipientEmail: "rohan.sharma@gmail.com",
+          subject: "Your Tantrapex Workshop Admit Card & Receipt - Interview Preparation Workshop",
+          timestamp: "2026-07-04T14:45:02-07:00",
+          status: "Delivered",
+          bodyPreview: "Dear Rohan, Thank you for registering. We have successfully processed your payment of Rs 199. Your Admit Card is attached..."
+        }
+      ];
+      localStorage.setItem('tpx_sent_emails', JSON.stringify(mockEmails));
+      return mockEmails;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const saveWorkshopRegistrations = (list: any[]) => {
+    localStorage.setItem('tpx_workshop_registrations', JSON.stringify(list));
+  };
+
+  const triggerToast = (msg: string) => {
+    setRegToast(msg);
+    setTimeout(() => setRegToast(null), 3000);
+  };
+
+  const handleResendRegEmail = (reg: any) => {
+    const emails = getEmailLogs();
+    const newMail = {
+      id: `mail-resend-${Date.now()}`,
+      recipientName: reg.name,
+      recipientEmail: reg.email,
+      subject: `[RESENT] Your Tantrapex Workshop Admit Card - ${reg.workshopTitle}`,
+      timestamp: new Date().toISOString(),
+      status: "Delivered",
+      bodyPreview: `Dear ${reg.name}, We have resent your entry ticket for "${reg.workshopTitle}" as requested. Unique Ticket ID: ${reg.id}. See details below...`
+    };
+    localStorage.setItem('tpx_sent_emails', JSON.stringify([newMail, ...emails]));
+    triggerToast(`Admit card sent to ${reg.email} successfully!`);
+  };
+
+  const handleExportRegsCSV = (regs: any[]) => {
+    const headers = "Registration ID,Name,Email,Phone,College,Branch,Year,Workshop,Price,Payment Status,Transaction ID,Registered At\n";
+    const rows = regs.map(r => 
+      `"${r.id}","${r.name}","${r.email}","${r.phone}","${r.college}","${r.branch}","${r.year}","${r.workshopTitle}",${r.pricePaid},"${r.paymentStatus}","${r.transactionId}","${r.registeredAt}"`
+    ).join("\n");
+    const csvContent = "data:text/csv;charset=utf-8," + headers + rows;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `tantrapex_workshop_students_report.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerToast("Detailed Report CSV downloaded successfully!");
   };
 
   return (
@@ -146,6 +452,7 @@ export default function AdminPanel({
             {[
               { id: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard },
               { id: 'pages', label: 'Pages & SEO Metadata', icon: FileText },
+              { id: 'policies-cms', label: 'Legal Policies Editor', icon: ShieldCheck },
               { id: 'students', label: 'Placed Students CRM', icon: Users },
               { id: 'partners', label: 'Hiring Partners', icon: Award },
               { id: 'courses', label: 'Courses Syllabus', icon: BookOpen },
@@ -153,6 +460,8 @@ export default function AdminPanel({
               { id: 'blogs', label: 'Blog Articles CMS', icon: Newspaper },
               { id: 'leads', label: 'Form Leads submissions', icon: FormInput },
               { id: 'workshops-cms', label: 'Workshops Manager', icon: Calendar },
+              { id: 'workshop-registrations', label: 'Workshop Registrations', icon: Ticket },
+              { id: 'plan-purchases', label: 'Plan Purchases CRM', icon: CreditCard },
               { id: 'media', label: 'Media asset library', icon: Image },
               { id: 'lms-cms', label: 'Student LMS Portal CMS', icon: GraduationCap },
               { id: 'ambassador-cms', label: 'Campus Ambassador CMS', icon: Megaphone },
@@ -341,6 +650,11 @@ export default function AdminPanel({
           </div>
         )}
 
+        {/* TAB: LEGAL POLICIES EDITOR */}
+        {activeTab === 'policies-cms' && (
+          <PoliciesAdminEditor settings={settings} setSettings={setSettings} />
+        )}
+
         {/* TAB 2: PAGES MANAGER & SEO */}
         {activeTab === 'pages' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans">
@@ -416,8 +730,8 @@ export default function AdminPanel({
               </div>
               <button 
                 onClick={() => {
-                  setSelectedStudent({ id: `stud-${Date.now()}`, name: '', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150', college: '', branch: '', year: '2024', company: '', packageLpa: '' });
-                  setStudentForm({ name: '', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150', college: '', branch: '', year: '2024', company: '', packageLpa: '' });
+                  setSelectedStudent({ id: `stud-${Date.now()}`, name: '', avatar: '', college: '', branch: '', year: '2024', company: '', packageLpa: '', showOnHomepage: true });
+                  setStudentForm({ name: '', avatar: '', college: '', branch: '', year: '2024', company: '', packageLpa: '', showOnHomepage: true });
                 }}
                 className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow"
               >
@@ -498,10 +812,27 @@ export default function AdminPanel({
                       onChange={(e) => setStudentForm({ ...studentForm, year: e.target.value })}
                       className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none"
                     >
-                      <option value="2024">2024</option>
-                      <option value="2023">2023</option>
+                      {yearOptions.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
                     </select>
                   </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                  <label className="font-bold text-slate-300 uppercase text-[9px]">Show On Homepage</label>
+                  <button
+                    onClick={() => setStudentForm({ ...studentForm, showOnHomepage: !studentForm.showOnHomepage })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      studentForm.showOnHomepage ? 'bg-emerald-600' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        studentForm.showOnHomepage ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-2 mt-2">
@@ -537,6 +868,7 @@ export default function AdminPanel({
                     <th className="px-6 py-4">Student</th>
                     <th className="px-6 py-4">Academic stream</th>
                     <th className="px-6 py-4">Recruiter details</th>
+                    <th className="px-6 py-4">Homepage Status</th>
                     <th className="px-6 py-4 text-right">Operations</th>
                   </tr>
                 </thead>
@@ -544,7 +876,13 @@ export default function AdminPanel({
                   {placedStudents.map((st) => (
                     <tr key={st.id} className="hover:bg-slate-50/50">
                       <td className="px-6 py-4 flex items-center gap-3">
-                        <img src={st.avatar} alt="Avatar" className="h-9 w-9 rounded-full object-cover shrink-0" />
+                        {st.avatar && st.avatar.trim() !== '' ? (
+                          <img src={st.avatar} alt="Avatar" className="h-9 w-9 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="h-9 w-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                            <User className="h-4 w-4 text-slate-400" />
+                          </div>
+                        )}
                         <span className="font-bold text-slate-950 text-sm">{st.name}</span>
                       </td>
                       <td className="px-6 py-4">
@@ -556,13 +894,20 @@ export default function AdminPanel({
                       <td className="px-6 py-4 font-bold text-blue-600">
                         {st.company} &bull; <span className="text-emerald-600 font-mono text-[11px]">{st.packageLpa}</span>
                       </td>
+                      <td className="px-6 py-4">
+                        {st.showOnHomepage !== false ? (
+                          <span className="px-2 py-1 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">Show On Home</span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-300 uppercase">Hidden</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button 
                             onClick={() => {
                               setSelectedStudent(st);
                               setStudentForm({
-                                name: st.name, avatar: st.avatar, college: st.college, branch: st.branch, year: st.year, company: st.company, packageLpa: st.packageLpa
+                                name: st.name, avatar: st.avatar, college: st.college, branch: st.branch, year: st.year, company: st.company, packageLpa: st.packageLpa, showOnHomepage: st.showOnHomepage !== false
                               });
                             }}
                             className="p-1.5 hover:bg-blue-50 text-blue-600 rounded"
@@ -771,7 +1116,7 @@ export default function AdminPanel({
 
                 <UniversalImageUploader 
                   label="Course Logo / Icon Image"
-                  value={courseForm.imageUrl}
+                  value={courseForm.imageUrl ?? ''}
                   onChange={(val) => setCourseForm(prev => ({ ...prev, imageUrl: val }))}
                   className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800/80"
                 />
@@ -1197,12 +1542,17 @@ export default function AdminPanel({
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {services.map((service) => (
-                <div key={service.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              {services.map((service, sIndex) => (
+                <div key={service.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
                   <div className="p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <h3 className="font-display font-bold text-slate-900 text-sm">{service.title}</h3>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                            #{sIndex + 1}
+                          </span>
+                          <h3 className="font-display font-bold text-slate-900 text-sm">{service.title}</h3>
+                        </div>
                         <p className="text-[10px] uppercase tracking-wider text-slate-400">{service.category}</p>
                       </div>
                       <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${service.published ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
@@ -1211,36 +1561,73 @@ export default function AdminPanel({
                     </div>
                     <p className="mt-3 text-slate-600 text-xs line-clamp-3">{service.shortDescription}</p>
                   </div>
-                  <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedService(service);
-                        setServiceForm({
-                          title: service.title,
-                          slug: service.slug,
-                          category: service.category,
-                          image: service.image,
-                          shortDescription: service.shortDescription,
-                          description: service.description,
-                          buttonText: service.buttonText,
-                          buttonLink: service.buttonLink,
-                          featured: service.featured,
-                          showOnHomepage: service.showOnHomepage,
-                          published: service.published,
-                          order: service.order,
-                          seo: service.seo
-                        });
-                      }}
-                      className="px-3 py-2 bg-slate-900 text-white rounded text-[10px] font-bold"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setServices(services.filter(s => s.id !== service.id))}
-                      className="px-3 py-2 bg-rose-50 text-rose-700 rounded text-[10px] font-bold"
-                    >
-                      Delete
-                    </button>
+                  <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2 bg-slate-50/50">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={sIndex === 0}
+                        onClick={() => {
+                          if (sIndex === 0) return;
+                          const newList = [...services];
+                          const temp = newList[sIndex - 1];
+                          newList[sIndex - 1] = newList[sIndex];
+                          newList[sIndex] = temp;
+                          setServices(newList);
+                        }}
+                        className="px-2 py-1.5 bg-slate-200 hover:bg-blue-600 hover:text-white disabled:opacity-30 text-slate-700 rounded text-[10px] font-bold transition-colors"
+                        title="Move Left / Earlier"
+                      >
+                        ← Up
+                      </button>
+                      <button
+                        type="button"
+                        disabled={sIndex === services.length - 1}
+                        onClick={() => {
+                          if (sIndex === services.length - 1) return;
+                          const newList = [...services];
+                          const temp = newList[sIndex + 1];
+                          newList[sIndex + 1] = newList[sIndex];
+                          newList[sIndex] = temp;
+                          setServices(newList);
+                        }}
+                        className="px-2 py-1.5 bg-slate-200 hover:bg-blue-600 hover:text-white disabled:opacity-30 text-slate-700 rounded text-[10px] font-bold transition-colors"
+                        title="Move Right / Later"
+                      >
+                        Down →
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedService(service);
+                          setServiceForm({
+                            title: service.title,
+                            slug: service.slug,
+                            category: service.category,
+                            image: service.image,
+                            shortDescription: service.shortDescription,
+                            description: service.description,
+                            buttonText: service.buttonText,
+                            buttonLink: service.buttonLink,
+                            featured: service.featured,
+                            showOnHomepage: service.showOnHomepage,
+                            published: service.published,
+                            order: service.order,
+                            seo: service.seo
+                          });
+                        }}
+                        className="px-3 py-1.5 bg-slate-900 text-white rounded text-[10px] font-bold hover:bg-slate-800 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setServices(services.filter(s => s.id !== service.id))}
+                        className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded text-[10px] font-bold transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1486,109 +1873,46 @@ export default function AdminPanel({
           const workshopsContent = workshopsSection?.content || {};
           const rawWorkshops = workshopsContent.workshops || [];
 
-          // Standard 10 default workshops as fallback reference
-          const defaultWorkshops = [
-            {
-              id: "wk-1",
-              title: "Resume Building Workshop",
-              desc: "Learn to build ATS friendly resume",
-              date: "25 May, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-2",
-              title: "Interview Preparation Workshop",
-              desc: "Crack interviews with confidence",
-              date: "01 June, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1573497191269-cc6db3aad297?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-3",
-              title: "Group Discussion Mastery",
-              desc: "Learn to lead group discussions. Gain templates to pitch your solutions confidently.",
-              date: "15 June, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-4",
-              title: "LinkedIn Branding Clinic",
-              desc: "Learn secrets to draft a profile summary, customize headlines, and message HRs directly.",
-              date: "22 June, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-5",
-              title: "Aptitude & Speed Math Masterclass",
-              desc: "Crack high-frequency aptitude questions and speed calculation patterns.",
-              date: "29 June, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-6",
-              title: "MNC Placement Mock Drill",
-              desc: "Observe a live simulated interview mimicking Tier-1 tech company rounds.",
-              date: "06 July, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "past-1",
-              title: "React & Frontend Architecture BootCamp",
-              desc: "A 2-day session covering component optimization, server rendering, and modern state managers.",
-              date: "10 May, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-2",
-              title: "Java Full-Stack & Microservices Seminar",
-              desc: "A hands-on walk-through of Spring Boot, API gateway setups, and database orchestration.",
-              date: "03 May, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-3",
-              title: "Campus to Corporate Transition Meet",
-              desc: "Essential soft-skills and workspace etiquette guidelines delivered by corporate HR headers.",
-              date: "25 April, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-4",
-              title: "SQL & Relational Database Essentials",
-              desc: "Master indexes, complex joins, subqueries, and execution plan optimizations for technical interviews.",
-              date: "18 April, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            }
-          ];
+          const currentWorkshops = Array.isArray(rawWorkshops) ? [...rawWorkshops] : [];
 
-          // Merge if needed so that first-time load contains all 10 workshops
-          const currentWorkshops = [...rawWorkshops];
-          if (currentWorkshops.length === 0 || !workshopsContent.isWorkshopsCustomized) {
-            defaultWorkshops.forEach((dw) => {
-              if (!currentWorkshops.some(w => w.title.toLowerCase() === dw.title.toLowerCase())) {
-                currentWorkshops.push(dw);
-              }
+          const galleryImages = Array.isArray(workshopsContent.galleryImages) && workshopsContent.galleryImages.length > 0
+            ? workshopsContent.galleryImages
+            : [
+                "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
+                "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=400",
+                "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=400",
+                "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400",
+                "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=500",
+                "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
+                "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
+                "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500"
+              ];
+
+          const handleSaveGallery = (updatedGallery: string[]) => {
+            setPages(prevPages => {
+              return prevPages.map(page => {
+                if (page.id === 'workshops') {
+                  return {
+                    ...page,
+                    sections: page.sections.map(section => {
+                      if (section.type === 'workshops-list') {
+                        return {
+                          ...section,
+                          content: {
+                            ...section.content,
+                            galleryImages: updatedGallery,
+                            isWorkshopsCustomized: true
+                          }
+                        };
+                      }
+                      return section;
+                    })
+                  };
+                }
+                return page;
+              });
             });
-          }
+          };
 
           const handleSaveWorkshop = () => {
             let updatedList = [];
@@ -1756,6 +2080,35 @@ export default function AdminPanel({
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-850">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h4 className="font-bold text-white text-xs">Is Free Workshop?</h4>
+                        <p className="text-slate-400 text-[10px]">Toggle if this workshop has no entrance fee.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setWorkshopForm({ ...workshopForm, isFree: !workshopForm.isFree, price: !workshopForm.isFree ? 0 : (workshopForm.price || 199) })}
+                        className={`w-12 h-6 rounded-full p-1 transition-colors relative cursor-pointer ${workshopForm.isFree ? 'bg-emerald-600' : 'bg-slate-700'}`}
+                      >
+                        <div className={`bg-white w-4 h-4 rounded-full shadow transition-transform duration-200 ${workshopForm.isFree ? 'translate-x-6' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+
+                    {!workshopForm.isFree && (
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-400 uppercase text-[9px]">Entry Ticket Price (INR)</label>
+                        <input
+                          type="number"
+                          value={workshopForm.price || ''}
+                          onChange={(e) => setWorkshopForm({ ...workshopForm, price: parseInt(e.target.value, 10) || 0 })}
+                          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-blue-500 font-mono"
+                          placeholder="e.g. 199"
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex items-center gap-2 mt-2">
                     <button 
                       onClick={handleSaveWorkshop}
@@ -1788,6 +2141,7 @@ export default function AdminPanel({
                       <tr className="bg-slate-100/50 text-slate-400 uppercase text-[9px] font-bold border-b border-slate-200">
                         <th className="p-4">Cover Image</th>
                         <th className="p-4">Workshop Detail</th>
+                        <th className="p-4">Price / Fee</th>
                         <th className="p-4">Schedule</th>
                         <th className="p-4">Location</th>
                         <th className="p-4">Timeline Status</th>
@@ -1803,6 +2157,13 @@ export default function AdminPanel({
                           <td className="p-4">
                             <div className="font-bold text-slate-900 text-sm">{item.title}</div>
                             <div className="text-slate-500 text-[10px] mt-0.5 line-clamp-1">{item.desc}</div>
+                          </td>
+                          <td className="p-4">
+                            {item.isFree || !item.price ? (
+                              <span className="px-2 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold rounded">FREE</span>
+                            ) : (
+                              <span className="px-2 py-1 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-bold font-mono rounded">₹{item.price}</span>
+                            )}
                           </td>
                           <td className="p-4 font-mono font-semibold text-slate-700">{item.date}</td>
                           <td className="p-4 text-slate-600">{item.location}</td>
@@ -1842,11 +2203,755 @@ export default function AdminPanel({
                   </table>
                 </div>
               </div>
+
+              {/* Workshop Gallery/Glimpses Editor */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm p-6 flex flex-col gap-6">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 uppercase">Workshop Glimpses & Gallery Editor</h3>
+                  <p className="text-slate-500 text-[11px] mt-0.5 font-sans">Manage the dynamic photos displayed in the 'Glimpses from our Workshops' section and the 'Gallery' tab of the Workshops page.</p>
+                </div>
+
+                {/* Multi image upload and URL paste form */}
+                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200/60 font-sans">
+                  <UniversalMultiImageUploader
+                    label="Add Multiple Photos (Upload Files or Paste URLs)"
+                    onImagesUploaded={(newUrls) => {
+                      const updatedGallery = [...galleryImages, ...newUrls];
+                      handleSaveGallery(updatedGallery);
+                    }}
+                    helperText="You can drop multiple image files, choose multiple files from your computer, or paste one/more URLs to instantly upload them all together!"
+                  />
+                </div>
+
+                {/* Grid of current images */}
+                <div>
+                  <div className="flex items-center justify-between mb-3 font-sans">
+                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Current Gallery Photos ({galleryImages.length})</span>
+                    <button
+                      onClick={() => {
+                        if (confirm("Reset gallery back to the default 8 Unsplash photos? This will overwrite your custom gallery images.")) {
+                          handleSaveGallery([
+                            "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
+                            "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=400",
+                            "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=400",
+                            "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400",
+                            "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=500",
+                            "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
+                            "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
+                            "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500"
+                          ]);
+                        }
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer flex items-center gap-1 font-sans"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      <span>Reset to Defaults</span>
+                    </button>
+                  </div>
+
+                  {galleryImages.length === 0 ? (
+                    <div className="text-center p-8 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-slate-400 font-sans">
+                      No gallery images uploaded yet. Use the tool above to add some or click Reset to Defaults.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4 font-sans">
+                      {galleryImages.map((img: string, index: number) => (
+                        <div key={index} className="group relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-50 shadow-sm">
+                          <img src={img} alt="Gallery item" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              onClick={() => {
+                                const updatedGallery = galleryImages.filter((_: string, idx: number) => idx !== index);
+                                handleSaveGallery(updatedGallery);
+                              }}
+                              className="p-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full transition-transform transform hover:scale-110 cursor-pointer shadow-md"
+                              title="Delete Photo"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           );
         })()}
 
-        {/* TAB 8: MEDIA asset library */}
+        {/* TAB: WORKSHOP REGISTRATIONS CRM */}
+        {activeTab === 'workshop-registrations' && (() => {
+          const regs = getWorkshopRegistrations();
+          const emails = getEmailLogs();
+          
+          // Filter registrations
+          const filteredRegs = regs.filter((r: any) => {
+            const matchesSearch = 
+              r.name.toLowerCase().includes(regSearchQuery.toLowerCase()) ||
+              r.email.toLowerCase().includes(regSearchQuery.toLowerCase()) ||
+              r.phone.includes(regSearchQuery) ||
+              r.college.toLowerCase().includes(regSearchQuery.toLowerCase()) ||
+              r.workshopTitle.toLowerCase().includes(regSearchQuery.toLowerCase());
+              
+            const matchesStatus = 
+              regStatusFilter === 'all' ||
+              (regStatusFilter === 'free' && r.isFree) ||
+              (regStatusFilter === 'paid' && !r.isFree);
+
+            const matchesWorkshop =
+              regWorkshopFilter === 'all' ||
+              r.workshopId === regWorkshopFilter;
+
+            return matchesSearch && matchesStatus && matchesWorkshop;
+          });
+
+          // Compute metrics
+          const totalCount = regs.length;
+          const totalEarnings = regs.reduce((sum: number, r: any) => sum + (r.pricePaid || 0), 0);
+          const freeCount = regs.filter((r: any) => r.isFree).length;
+          const paidCount = regs.filter((r: any) => !r.isFree).length;
+
+          // Unique workshops for filtering
+          const uniqueWkOptions = Array.from(new Set<string>(regs.map((r: any) => JSON.stringify({ id: r.workshopId, title: r.workshopTitle }))))
+            .map((str) => JSON.parse(str));
+
+          const handleDeleteReg = (id: string) => {
+            const confirmed = window.confirm("Are you sure you want to delete this student registration?");
+            if (confirmed) {
+              const updated = regs.filter((r: any) => r.id !== id);
+              saveWorkshopRegistrations(updated);
+              triggerToast("Registration deleted successfully!");
+            }
+          };
+
+          // Canvas Admit Card Generator
+          const downloadAdmitCardPNG = (student: any) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 750;
+            canvas.height = 950;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Background
+            ctx.fillStyle = '#0b1329'; // Deep Space Navy
+            ctx.fillRect(0, 0, 750, 950);
+
+            // Tech Grid Accents
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.15)'; // Emerald
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 750; i += 30) {
+              ctx.beginPath();
+              ctx.moveTo(i, 0);
+              ctx.lineTo(i, 950);
+              ctx.stroke();
+            }
+            for (let j = 0; j < 950; j += 30) {
+              ctx.beginPath();
+              ctx.moveTo(0, j);
+              ctx.lineTo(750, j);
+              ctx.stroke();
+            }
+
+            // Outer Neon Border
+            ctx.strokeStyle = student.isFree ? '#10b981' : '#3b82f6'; // Emerald or Blue
+            ctx.lineWidth = 6;
+            ctx.strokeRect(20, 20, 710, 910);
+
+            // Header Banner
+            ctx.fillStyle = student.isFree ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)';
+            ctx.fillRect(40, 40, 670, 110);
+            ctx.strokeStyle = student.isFree ? '#10b981' : '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(40, 40, 670, 110);
+
+            // Header Text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 32px sans-serif';
+            ctx.fillText('TANTRA PEX MASTERCLASS', 80, 105);
+
+            ctx.fillStyle = student.isFree ? '#10b981' : '#3b82f6';
+            ctx.font = '900 13px sans-serif';
+            ctx.fillText('OFFICIAL ENTRY PASS & ADMIT CARD', 80, 72);
+
+            // Ticket Details Border Box
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.strokeRect(40, 180, 670, 520);
+
+            // Vertical divider
+            ctx.beginPath();
+            ctx.moveTo(420, 180);
+            ctx.lineTo(420, 700);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.stroke();
+
+            // Left Side: Student Details
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('STUDENT NAME', 70, 220);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.fillText(student.name, 70, 245);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('EMAIL ADDRESS', 70, 300);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillText(student.email, 70, 322);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('TELEPHONE / CONTACT', 70, 370);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillText(student.phone, 70, 392);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('ACADEMIC COLLEGE / BRANCH', 70, 440);
+            ctx.fillStyle = '#f1f5f9';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillText(student.college, 70, 462);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.font = '12px sans-serif';
+            ctx.fillText(`${student.branch} • ${student.year}`, 70, 482);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('WORKSHOP ALLOCATION', 70, 540);
+            ctx.fillStyle = student.isFree ? '#10b981' : '#3b82f6';
+            ctx.font = 'black 18px sans-serif';
+            ctx.fillText(student.workshopTitle, 70, 565);
+
+            // Right Side: Pass Details & QR Code box
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('TICKET ID', 450, 220);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 15px sans-serif';
+            ctx.fillText(student.id, 450, 242);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('TRANSACTION ID', 450, 290);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText(student.transactionId || 'TPX-FREE-SECURE', 450, 312);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('PASS CLASSIFICATION', 450, 360);
+            ctx.fillStyle = student.isFree ? '#10b981' : '#3b82f6';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText(student.isFree ? 'FREE PASS' : `PAID PASS • ₹${student.pricePaid}`, 450, 385);
+
+            // Simulated Barcode inside canvas
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(450, 430, 220, 55);
+            ctx.fillStyle = '#000000';
+            for (let i = 0; i < 220; i += Math.random() * 8 + 2) {
+              const barWidth = Math.floor(Math.random() * 4) + 1;
+              ctx.fillRect(450 + i, 430, barWidth, 55);
+            }
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('VERIFIABLE SECURITY BARCODE', 465, 502);
+
+            // Bottom Footer of Admit Card
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(40, 720, 670, 170);
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.strokeRect(40, 720, 670, 170);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillText('IMPORTANT CANDIDATE INSTRUCTIONS', 65, 755);
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('1. Please carry either a print-out of this pass or keep the PNG handy on your smartphone.', 65, 785);
+            ctx.fillText('2. Entrance gate closes 15 minutes prior to the scheduled masterclass start time.', 65, 810);
+            ctx.fillText('3. All workshop assets, templates, and certificates will be unlocked instantly post-session.', 65, 835);
+            ctx.fillText('4. For any queries, drop an email to: support@tantrapex.com quote your Ticket ID.', 65, 860);
+
+            // Save to file download
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `Admit_Card_${student.name.replace(/\s+/g, '_')}_TPX.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            triggerToast("Admit Card download started automatically!");
+          };
+
+          return (
+            <div className="flex flex-col gap-6 text-left text-xs font-sans">
+              
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Workshop Registrations</h1>
+                  <p className="text-slate-500">View detailed reports, download student admit cards, and review simulated Razorpay transaction receipts.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleExportRegsCSV(filteredRegs)}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors text-[10px] uppercase"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export CSV Report
+                  </button>
+                </div>
+              </div>
+
+              {/* Toast Notifications */}
+              {regToast && (
+                <div className="fixed bottom-5 right-5 z-50 bg-slate-900 border border-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 shadow-2xl animate-fade-in font-bold text-[10px] uppercase tracking-wider">
+                  <CheckCircle className="h-4 w-4 text-emerald-400" />
+                  {regToast}
+                </div>
+              )}
+
+              {/* Metrics cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                  <div>
+                    <div className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">Total Registered</div>
+                    <div className="text-2xl font-bold font-mono text-slate-900 mt-1">{totalCount} Students</div>
+                  </div>
+                  <div className="p-3 bg-slate-100 rounded-xl">
+                    <Users className="h-5 w-5 text-slate-600" />
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                  <div>
+                    <div className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">Total Earnings</div>
+                    <div className="text-2xl font-bold font-mono text-emerald-600 mt-1">₹{totalEarnings.toLocaleString()}</div>
+                  </div>
+                  <div className="p-3 bg-emerald-50 rounded-xl">
+                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                  <div>
+                    <div className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">Free Masterclasses</div>
+                    <div className="text-2xl font-bold font-mono text-blue-600 mt-1">{freeCount} Entries</div>
+                  </div>
+                  <div className="p-3 bg-blue-50 rounded-xl">
+                    <Ticket className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                  <div>
+                    <div className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">Paid Entries</div>
+                    <div className="text-2xl font-bold font-mono text-indigo-600 mt-1">{paidCount} Tickets</div>
+                  </div>
+                  <div className="p-3 bg-indigo-50 rounded-xl">
+                    <Award className="h-5 w-5 text-indigo-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters Panel */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={regSearchQuery}
+                    onChange={(e) => setRegSearchQuery(e.target.value)}
+                    placeholder="Search student name, email, phone, college, or workshop title..."
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                  />
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    value={regStatusFilter}
+                    onChange={(e) => setRegStatusFilter(e.target.value)}
+                    className="px-3 py-2 border border-slate-200 rounded-lg text-slate-700 bg-white"
+                  >
+                    <option value="all">All Payment Status</option>
+                    <option value="free">FREE Entry Pass</option>
+                    <option value="paid">PAID Entrance Ticket</option>
+                  </select>
+
+                  <select
+                    value={regWorkshopFilter}
+                    onChange={(e) => setRegWorkshopFilter(e.target.value)}
+                    className="px-3 py-2 border border-slate-200 rounded-lg text-slate-700 bg-white max-w-xs"
+                  >
+                    <option value="all">All Allocated Workshops</option>
+                    {uniqueWkOptions.map((opt: any) => (
+                      <option key={opt.id} value={opt.id}>{opt.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Registered Students Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Students Enrolled ({filteredRegs.length} total)</span>
+                  <span className="text-[10px] text-slate-400">Showing filtered masterclass registrations</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-100/50 text-slate-400 uppercase text-[9px] font-bold border-b border-slate-200">
+                        <th className="p-4">Ticket ID</th>
+                        <th className="p-4">Student Details</th>
+                        <th className="p-4">College & Branch</th>
+                        <th className="p-4">Workshop Selected</th>
+                        <th className="p-4">Price Paid</th>
+                        <th className="p-4">Transaction ID</th>
+                        <th className="p-4">Payment Status</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredRegs.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-12 text-center text-slate-400">
+                            No student registrations match your filter parameters.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredRegs.map((r: any, idx: number) => (
+                          <tr key={r.id || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-4 font-mono font-bold text-slate-600">{r.id}</td>
+                            <td className="p-4">
+                              <div className="font-bold text-slate-900">{r.name}</div>
+                              <div className="text-slate-500 text-[10px]">{r.email}</div>
+                              <div className="text-slate-500 text-[10px]">{r.phone}</div>
+                            </td>
+                            <td className="p-4">
+                              <div className="font-medium text-slate-800">{r.college}</div>
+                              <div className="text-slate-500 text-[10px]">{r.branch} • {r.year}</div>
+                            </td>
+                            <td className="p-4 font-bold text-slate-700">{r.workshopTitle}</td>
+                            <td className="p-4 font-mono font-bold text-slate-900">
+                              {r.isFree ? '₹0' : `₹${r.pricePaid}`}
+                            </td>
+                            <td className="p-4 font-mono text-[10px] text-slate-400">{r.transactionId || 'N/A'}</td>
+                            <td className="p-4">
+                              {r.isFree ? (
+                                <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black rounded uppercase">Confirmed</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-black rounded uppercase">Paid</span>
+                              )}
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => setSelectedRegForTicket(r)}
+                                  className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded-lg transition-colors cursor-pointer"
+                                  title="View entry pass ticket details"
+                                >
+                                  <Ticket className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleResendRegEmail(r)}
+                                  className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors cursor-pointer"
+                                  title="Resend Admit Card Email"
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteReg(r.id)}
+                                  className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete registration entry"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Simulated Email Logs Log Panel */}
+              <div className="bg-slate-900 text-white rounded-2xl border border-slate-800 p-6 flex flex-col gap-4 shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-emerald-400 animate-pulse" /> Outgoing Email Delivery Server Logs (CRM Integration)
+                    </h2>
+                    <p className="text-slate-400 text-[10px] mt-0.5">Live background server logs tracking confirmation mails with PDF/PNG Ticket attachments dispatched.</p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-[9px] font-black uppercase rounded-lg">SMTP Active</span>
+                </div>
+
+                <div className="flex flex-col gap-3 max-h-80 overflow-y-auto pr-1">
+                  {emails.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500">No emails have been dispatched by the server yet.</div>
+                  ) : (
+                    emails.map((m: any, idx: number) => (
+                      <div key={m.id || idx} className="bg-slate-950 p-4 rounded-xl border border-slate-850 flex flex-col gap-2 hover:border-slate-700 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900">
+                            Sent to: {m.recipientName} ({m.recipientEmail})
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-mono">{new Date(m.timestamp).toLocaleString()}</span>
+                        </div>
+                        <div className="text-xs font-bold text-slate-200">Subject: {m.subject}</div>
+                        <p className="text-slate-400 text-[11px] font-mono leading-relaxed bg-slate-900/60 p-2.5 rounded border border-slate-800/50">
+                          {m.bodyPreview}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Delivered • 1 Attachment Dispatched (Admit_Card_PNG)
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Detailed Pass Overlay Card Modal */}
+              {selectedRegForTicket && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 flex flex-col gap-6 shadow-2xl animate-scale-up text-white relative">
+                    <button
+                      onClick={() => setSelectedRegForTicket(null)}
+                      className="absolute top-4 right-4 p-1 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                    >
+                      <X className="h-5 w-5 text-slate-400" />
+                    </button>
+
+                    <div className="text-center">
+                      <span className="px-3 py-1 bg-emerald-950 border border-emerald-800 text-emerald-400 text-[10px] font-black rounded-full uppercase tracking-wider">
+                        Verifiable Official Entry Pass
+                      </span>
+                      <h2 className="text-xl font-display font-extrabold text-white mt-2 uppercase tracking-wide">
+                        Admit Card Entry Pass
+                      </h2>
+                      <p className="text-slate-400 text-[10px] mt-0.5">Below is the entrance admit card generated for the enrolled session.</p>
+                    </div>
+
+                    {/* Highly stylized visual pass pass boarding style card */}
+                    <div className={`p-5 rounded-2xl border ${selectedRegForTicket.isFree ? 'border-emerald-600/50 bg-emerald-950/10' : 'border-blue-600/50 bg-blue-950/10'} relative overflow-hidden flex flex-col gap-4 shadow-inner`}>
+                      
+                      {/* Grid background visual */}
+                      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none"></div>
+
+                      <div className="flex justify-between items-start border-b border-slate-800 pb-3 relative z-10">
+                        <div>
+                          <div className="text-[10px] font-black text-slate-400 tracking-wider">TANTRA PEX</div>
+                          <div className="text-base font-extrabold text-white">{selectedRegForTicket.workshopTitle}</div>
+                        </div>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${selectedRegForTicket.isFree ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                          {selectedRegForTicket.isFree ? 'FREE ENTRY' : `PAID TICKET`}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 relative z-10 font-mono text-[11px] leading-relaxed">
+                        <div>
+                          <div className="text-slate-500 font-bold uppercase text-[9px]">Student Name</div>
+                          <div className="text-white font-bold text-xs">{selectedRegForTicket.name}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500 font-bold uppercase text-[9px]">Ticket Pass ID</div>
+                          <div className="text-emerald-400 font-bold text-xs">{selectedRegForTicket.id}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500 font-bold uppercase text-[9px]">College Allocation</div>
+                          <div className="text-slate-200 text-xs truncate" title={selectedRegForTicket.college}>{selectedRegForTicket.college}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500 font-bold uppercase text-[9px]">Transaction Ref</div>
+                          <div className="text-slate-300 text-xs truncate">{selectedRegForTicket.transactionId || 'TPX-FREE-987A'}</div>
+                        </div>
+                      </div>
+
+                      {/* Barcode representation */}
+                      <div className="bg-white p-3 rounded-xl flex flex-col items-center gap-1.5 relative z-10">
+                        <div className="w-full h-10 flex gap-0.5 justify-center overflow-hidden">
+                          {Array.from({ length: 48 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="bg-slate-950 h-full"
+                              style={{ width: `${Math.floor(Math.random() * 3) + 1}px` }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[9px] font-mono text-slate-600 font-bold tracking-widest">{selectedRegForTicket.id}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => downloadAdmitCardPNG(selectedRegForTicket)}
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer transition-colors uppercase tracking-wider text-[10px]"
+                      >
+                        Download Admit Card PNG
+                      </button>
+                      <button
+                        onClick={() => setSelectedRegForTicket(null)}
+                        className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg cursor-pointer transition-colors text-[10px]"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* TAB: PLAN PURCHASES CRM */}
+        {activeTab === 'plan-purchases' && (() => {
+          const purchases = getPlanPurchases();
+          const filteredPurchases = purchases.filter((p: any) => {
+            return (
+              p.studentName.toLowerCase().includes(planSearchQuery.toLowerCase()) ||
+              p.studentEmail.toLowerCase().includes(planSearchQuery.toLowerCase()) ||
+              p.studentPhone.includes(planSearchQuery) ||
+              p.planName.toLowerCase().includes(planSearchQuery.toLowerCase()) ||
+              p.paymentId.toLowerCase().includes(planSearchQuery.toLowerCase())
+            );
+          });
+
+          const totalRevenue = purchases.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+          const totalCount = purchases.length;
+          const avgTicket = totalCount > 0 ? (totalRevenue / totalCount).toFixed(0) : "0";
+
+          return (
+            <div className="flex flex-col gap-6 text-left text-xs font-sans">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Pricing Plan Purchases CRM</h1>
+                  <p className="text-slate-500">Live payment audit board. Track premium users, active plan subscribers, and auto-dispatch logs.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="bg-emerald-500/10 text-emerald-700 font-bold px-3 py-1.5 rounded-full text-[10px] uppercase border border-emerald-500/20">
+                    Live Transactions Active
+                  </div>
+                </div>
+              </div>
+
+              {/* Metrics Panels */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Sales Volume</span>
+                  <span className="text-2xl font-black text-slate-900">₹{totalRevenue.toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] text-emerald-600 font-bold mt-1">100% captured via Razorpay</span>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subscriber Enrollments</span>
+                  <span className="text-2xl font-black text-slate-900">{totalCount} Active</span>
+                  <span className="text-[10px] text-slate-500 mt-1">Total premium accounts created</span>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average Order Value (AOV)</span>
+                  <span className="text-2xl font-black text-slate-900">₹{avgTicket}</span>
+                  <span className="text-[10px] text-blue-600 font-bold mt-1">Pricing package conversions</span>
+                </div>
+              </div>
+
+              {/* Search Control Board */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 justify-between items-center">
+                <div className="relative w-full sm:w-80">
+                  <FormInput className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by student, plan, payment ID..."
+                    value={planSearchQuery}
+                    onChange={(e) => setPlanSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleAdminTestPayment}
+                    disabled={isRunningAdminTestPayment}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider transition-colors"
+                  >
+                    {isRunningAdminTestPayment ? 'Processing ₹1 Test...' : 'Trigger ₹1 Razorpay Test'}
+                  </button>
+                  <span className="text-slate-500 font-medium text-[11px] shrink-0">
+                    Showing {filteredPurchases.length} of {totalCount} records
+                  </span>
+                </div>
+              </div>
+
+              {adminTestPaymentStatus.type && (
+                <div className={`p-3 rounded-lg border text-xs font-medium ${
+                  adminTestPaymentStatus.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}>
+                  {adminTestPaymentStatus.message}
+                </div>
+              )}
+
+              {/* Data Table */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-4">Student Info</th>
+                        <th className="py-3 px-4">Enrolled Plan</th>
+                        <th className="py-3 px-4">Payment ID</th>
+                        <th className="py-3 px-4">Order ID</th>
+                        <th className="py-3 px-4">Date & Time</th>
+                        <th className="py-3 px-4">Amount</th>
+                        <th className="py-3 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {filteredPurchases.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-12 text-center text-slate-500">
+                            No billing plan purchase matching your criteria was found.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredPurchases.map((p: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-900 text-xs">{p.studentName}</span>
+                                <span className="text-[10px] text-slate-500">{p.studentEmail}</span>
+                                <span className="text-[10px] text-slate-400">{p.studentPhone}</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900">
+                              <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-[10px] uppercase font-bold border border-blue-100">
+                                {p.planName}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600 font-bold">{p.paymentId}</td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400">{p.orderId}</td>
+                            <td className="py-3.5 px-4 text-slate-500 text-[11px]">{p.date}</td>
+                            <td className="py-3.5 px-4 font-extrabold text-slate-900 text-xs">₹{p.amount}</td>
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-full text-[10px] border border-emerald-100">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Captured
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {activeTab === 'media' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans">
             <div className="flex items-center justify-between">
@@ -2633,7 +3738,7 @@ export default function AdminPanel({
                   <label className="font-semibold text-slate-600">LinkedIn Company Handle</label>
                   <input 
                     type="text" 
-                    value={settings.socialMedia.linkedin}
+                    value={settings.socialMedia.linkedin || ''}
                     onChange={(e) => setSettings({ ...settings, socialMedia: { ...settings.socialMedia, linkedin: e.target.value } })}
                     className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800"
                   />
@@ -2642,8 +3747,35 @@ export default function AdminPanel({
                   <label className="font-semibold text-slate-600">Twitter Profile Handle</label>
                   <input 
                     type="text" 
-                    value={settings.socialMedia.twitter}
+                    value={settings.socialMedia.twitter || ''}
                     onChange={(e) => setSettings({ ...settings, socialMedia: { ...settings.socialMedia, twitter: e.target.value } })}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-semibold text-slate-600">Facebook Page URL</label>
+                  <input 
+                    type="text" 
+                    value={settings.socialMedia.facebook || ''}
+                    onChange={(e) => setSettings({ ...settings, socialMedia: { ...settings.socialMedia, facebook: e.target.value } })}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-semibold text-slate-600">Instagram Handle</label>
+                  <input 
+                    type="text" 
+                    value={settings.socialMedia.instagram || ''}
+                    onChange={(e) => setSettings({ ...settings, socialMedia: { ...settings.socialMedia, instagram: e.target.value } })}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="font-semibold text-slate-600">YouTube Channel URL</label>
+                  <input 
+                    type="text" 
+                    value={settings.socialMedia.youtube || ''}
+                    onChange={(e) => setSettings({ ...settings, socialMedia: { ...settings.socialMedia, youtube: e.target.value } })}
                     className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800"
                   />
                 </div>
@@ -2656,21 +3788,63 @@ export default function AdminPanel({
                 <Settings className="h-4 w-4 text-rose-500" />
                 <span>Security & Admin Access Password</span>
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-slate-600">Admin Editor Password</label>
-                  <input 
-                    type="text" 
-                    value={settings.adminPassword || 'admin123'}
-                    onChange={(e) => setSettings({ ...settings, adminPassword: e.target.value })}
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800 font-mono"
-                    placeholder="e.g. admin123"
-                  />
-                  <span className="text-[10px] text-slate-400">
-                    This password is required to switch the website into "Visual Editor" or "Admin Dashboard" modes. Keep it safe!
-                  </span>
+              
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mt-2 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between text-xs bg-slate-100/50 p-3 rounded-lg border border-slate-200/50">
+                  <div>
+                    <div className="font-semibold text-slate-700">Current Admin Password</div>
+                    <div className="text-[10px] text-slate-400">Used to access the editor modes.</div>
+                  </div>
+                  <div className="font-mono font-bold bg-white border border-slate-200 px-3 py-1 rounded text-slate-800 select-all">
+                    {settings.adminPassword || 'admin123'}
+                  </div>
                 </div>
+
+                <form onSubmit={handleUpdateAdminPassword} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-semibold text-slate-600 text-xs">New Admin Password</label>
+                    <input 
+                      type="text" 
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      className="px-3 py-2 bg-white border border-slate-200 rounded text-slate-800 font-mono text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                      placeholder="e.g. securePass123"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-semibold text-slate-600 text-xs">Developer Master Password</label>
+                    <input 
+                      type="password" 
+                      value={devMasterPassword}
+                      onChange={(e) => setDevMasterPassword(e.target.value)}
+                      className="px-3 py-2 bg-white border border-slate-200 rounded text-slate-800 font-mono text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                      placeholder="Enter password from env file..."
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isUpdatingPassword}
+                      className="px-4 py-2 bg-slate-900 hover:bg-slate-850 disabled:bg-slate-300 text-white font-semibold text-xs rounded transition-colors"
+                    >
+                      {isUpdatingPassword ? 'Saving Permanently...' : 'Change Password Permanently'}
+                    </button>
+                  </div>
+                </form>
+
+                {passwordUpdateStatus.type && (
+                  <div className={`p-3 rounded text-xs font-medium border ${
+                    passwordUpdateStatus.type === 'success' 
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                      : 'bg-rose-50 border-rose-200 text-rose-800'
+                  }`}>
+                    {passwordUpdateStatus.message}
+                  </div>
+                )}
               </div>
+
 
               <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between text-emerald-800 font-semibold mt-4">
                 <span>Branding assets and settings saved and updated instantly on database!</span>

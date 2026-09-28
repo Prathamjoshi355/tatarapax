@@ -12,10 +12,6 @@ import AdminPanel from './components/dashboard/AdminPanel';
 import PasswordGateway from './components/dashboard/PasswordGateway';
 import VisualEditorHeader from './components/dashboard/VisualEditorHeader';
 import { CMSPage, GlobalSettings, MediaItem, PlacedStudent, HiringPartner, Course, BlogPost, Lead, CMSSection, Service } from './types';
-import { 
-  DEFAULT_PAGES, DEFAULT_SETTINGS, DEFAULT_MEDIA, DEFAULT_PLACED_STUDENTS, 
-  DEFAULT_HIRING_PARTNERS, DEFAULT_COURSES, DEFAULT_BLOGS, DEFAULT_LEADS, DEFAULT_SERVICES 
-} from './db/defaultData';
 
 // Public Page implementations
 import PublicHomePage from './public/home';
@@ -24,6 +20,7 @@ import PublicServicesPage from './public/services';
 import PublicBlogPage from './public/blog';
 import PublicContactPage from './public/contact';
 import PublicCollegePartnershipPage from './public/colleges';
+import PolicyPage from './components/pages/PolicyPage';
 
 // Admin Page implementations
 import AdminHomePage from './superadmin/admin/home';
@@ -43,6 +40,46 @@ import VisualEditorContactPage from './superadmin/visual/contact';
 // Super Admin Dashboard
 import SuperAdminDashboard from './superadmin/dashboard';
 
+const EMPTY_SETTINGS: GlobalSettings = {
+  logoText: "",
+  logoSubText: "",
+  logoUrl: "",
+  email: "",
+  phone: "",
+  address: "",
+  socialMedia: {
+    facebook: "",
+    twitter: "",
+    linkedin: "",
+    instagram: "",
+    youtube: ""
+  },
+  primaryColor: "",
+  secondaryColor: "",
+  themeMode: "light",
+  containerWidth: "max-w-full",
+  adminPassword: "",
+  menuItems: []
+};
+
+const EMPTY_PAGE: CMSPage = {
+  id: 'home',
+  title: 'Home',
+  slug: '/',
+  seo: { title: '', description: '', keywords: '' },
+  sections: []
+};
+
+const WORKSHOP_SEED_TITLES = new Set([
+  'Group Discussion Mastery',
+  'LinkedIn Branding Clinic',
+  'Aptitude & Speed Math Masterclass',
+  'MNC Placement Mock Drill',
+  'React & Frontend Architecture BootCamp',
+  'Resume Building Workshop',
+  'Interview Preparation Workshop'
+]);
+
 const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
   return rawPages.map(page => {
     if (!page || !page.sections) return page;
@@ -58,6 +95,54 @@ const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
       cleanedSections = page.sections.filter(
         section => section.type !== 'mission-vision' && section.type !== 'why-us-list'
       );
+    }
+
+    if (page.id === 'home') {
+      cleanedSections = page.sections.map(section => {
+        if (section.type === 'hero' && section.content) {
+          return {
+            ...section,
+            content: {
+              ...section.content,
+              primaryBtnLink: '#pricing'
+            }
+          };
+        }
+        if (section.type === 'cta-banner' && section.content) {
+          return {
+            ...section,
+            content: {
+              ...section.content,
+              primaryBtnLink: '#pricing'
+            }
+          };
+        }
+        return section;
+      });
+    }
+
+    if (page.id === 'workshops') {
+      cleanedSections = page.sections.map(section => {
+        if (section.type !== 'workshops-list') return section;
+
+        const workshopItems = Array.isArray(section.content?.workshops) ? section.content.workshops : [];
+        const isSeedWorkshopList = workshopItems.some((item: any) =>
+          typeof item?.title === 'string' && WORKSHOP_SEED_TITLES.has(item.title.trim())
+        );
+
+        if (section.content?.isWorkshopsCustomized !== true || isSeedWorkshopList) {
+          return {
+            ...section,
+            content: {
+              ...(section.content || {}),
+              workshops: [],
+              isWorkshopsCustomized: false
+            }
+          };
+        }
+
+        return section;
+      });
     }
 
     return {
@@ -134,72 +219,79 @@ const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
   });
 };
 
+const normalizeRoute = (hash: string): string => {
+  const rawHash = (hash || '#/').trim().toLowerCase();
+  const withoutHash = rawHash.startsWith('#') ? rawHash.slice(1) : rawHash;
+  const withoutLeadingSlash = withoutHash.startsWith('/') ? withoutHash.slice(1) : withoutHash;
+  const withoutSearch = withoutLeadingSlash.split(/[?#]/)[0];
+  return withoutSearch.replace(/\/+$/g, '');
+};
+
+const normalizePageSlug = (slug: string): string => {
+  return (slug || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+};
+
+const resolvePublicPageId = (route: string, pages: CMSPage[]): string | null => {
+  const normalized = route.trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+  if (normalized === '' || normalized === 'home') return 'home';
+  if (normalized === 'lms') return 'lms';
+  if (normalized === 'privacy') return 'privacy';
+  if (normalized === 'terms' || normalized === 'terms-of-service' || normalized === 'terms-of-use') return 'terms';
+  if (normalized === 'disclaimer') return 'disclaimer';
+  if (normalized === 'refund' || normalized === 'refund-policy' || normalized === 'cancellation-refund' || normalized === 'cancellation-and-refund-policy') return 'refund-policy';
+  if (normalized.startsWith('page-')) return normalized.replace(/^page-/, '');
+
+  const matchedPage = pages.find((p) => {
+    const pageSlug = normalizePageSlug(p.slug);
+    return (
+      p.id.toLowerCase() === normalized ||
+      pageSlug === normalized
+    );
+  });
+  return matchedPage ? matchedPage.id : null;
+};
+
 export default function App() {
   // Master persistent states loading from localStorage
   const [pages, setPages] = useState<CMSPage[]>(() => {
     const saved = localStorage.getItem('tpx_pages');
-    const rawPages = saved ? JSON.parse(saved) : DEFAULT_PAGES;
-    const uniqueMap = new Map();
-    rawPages.forEach((p: CMSPage) => {
-      if (p && p.id) {
-        uniqueMap.set(p.id, p);
-      }
-    });
-    return sanitizePages(Array.from(uniqueMap.values()));
+    if (!saved) return [EMPTY_PAGE];
+
+    try {
+      const parsed = JSON.parse(saved) as CMSPage[];
+      if (!Array.isArray(parsed) || parsed.length === 0) return [EMPTY_PAGE];
+
+      const uniqueMap = new Map<string, CMSPage>();
+      parsed.forEach((p: CMSPage) => {
+        if (p && p.id) {
+          uniqueMap.set(p.id, p);
+        }
+      });
+
+      const pagesFromStorage = Array.from(uniqueMap.values());
+      return sanitizePages(pagesFromStorage.length > 0 ? pagesFromStorage : [EMPTY_PAGE]);
+    } catch {
+      return [EMPTY_PAGE];
+    }
   });
 
   const [settings, setSettings] = useState<GlobalSettings>(() => {
     const saved = localStorage.getItem('tpx_settings');
-    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-    if (parsed && parsed.menuItems) {
-      const hasWorkshops = parsed.menuItems.some((m: any) => m.pageId === 'workshops');
-      const hasBlog = parsed.menuItems.some((m: any) => m.pageId === 'blog');
-      const hasLms = parsed.menuItems.some((m: any) => m.pageId === 'lms');
-      
-      let updatedMenu = [...parsed.menuItems];
-      let maxOrder = Math.max(...updatedMenu.map((m: any) => m.order || 0), 0);
-      
-      if (!hasWorkshops) {
-        maxOrder++;
-        updatedMenu.push({
-          id: "menu-workshops",
-          label: "Workshops",
-          pageId: "workshops",
-          order: maxOrder,
-          isVisible: true
-        });
-      }
-      
-      if (!hasBlog) {
-        maxOrder++;
-        updatedMenu.push({
-          id: "menu-blog",
-          label: "Blogs",
-          pageId: "blog",
-          order: maxOrder,
-          isVisible: true
-        });
-      }
-      
-      if (!hasLms) {
-        maxOrder++;
-        updatedMenu.push({
-          id: "menu-lms",
-          label: "LMS",
-          pageId: "lms",
-          order: maxOrder,
-          isVisible: true
-        });
-      }
-      parsed.menuItems = updatedMenu;
+    const parsed = saved ? JSON.parse(saved) : {};
+    const mergedSettings = { ...EMPTY_SETTINGS, ...parsed } as GlobalSettings;
+
+    if (!mergedSettings.menuItems || mergedSettings.menuItems.length === 0) {
+      mergedSettings.menuItems = [];
     }
-    return parsed;
+
+    return mergedSettings;
   });
 
   const [media, setMedia] = useState<MediaItem[]>(() => {
     const saved = localStorage.getItem('tpx_media');
-    const rawMedia = saved ? JSON.parse(saved) : DEFAULT_MEDIA;
-    const uniqueMap = new Map();
+    const rawMedia = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(rawMedia) || rawMedia.length === 0) return [];
+    const uniqueMap = new Map<string, MediaItem>();
     rawMedia.forEach((m: MediaItem) => {
       if (m && m.id) {
         uniqueMap.set(m.id, m);
@@ -210,8 +302,9 @@ export default function App() {
 
   const [placedStudents, setPlacedStudents] = useState<PlacedStudent[]>(() => {
     const saved = localStorage.getItem('tpx_placed_students');
-    const raw = saved ? JSON.parse(saved) : DEFAULT_PLACED_STUDENTS;
-    const uniqueMap = new Map();
+    const raw = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    const uniqueMap = new Map<string, PlacedStudent>();
     raw.forEach((item: PlacedStudent) => {
       if (item && item.id) {
         uniqueMap.set(item.id, item);
@@ -222,8 +315,9 @@ export default function App() {
 
   const [hiringPartners, setHiringPartners] = useState<HiringPartner[]>(() => {
     const saved = localStorage.getItem('tpx_hiring_partners');
-    const raw = saved ? JSON.parse(saved) : DEFAULT_HIRING_PARTNERS;
-    const uniqueMap = new Map();
+    const raw = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    const uniqueMap = new Map<string, HiringPartner>();
     raw.forEach((item: HiringPartner) => {
       if (item && item.id) {
         uniqueMap.set(item.id, item);
@@ -234,8 +328,9 @@ export default function App() {
 
   const [courses, setCourses] = useState<Course[]>(() => {
     const saved = localStorage.getItem('tpx_courses');
-    const raw = saved ? JSON.parse(saved) : DEFAULT_COURSES;
-    const uniqueMap = new Map();
+    const raw = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    const uniqueMap = new Map<string, Course>();
     raw.forEach((item: Course) => {
       if (item && item.id) {
         uniqueMap.set(item.id, item);
@@ -246,8 +341,9 @@ export default function App() {
 
   const [blogs, setBlogs] = useState<BlogPost[]>(() => {
     const saved = localStorage.getItem('tpx_blogs');
-    const raw = saved ? JSON.parse(saved) : DEFAULT_BLOGS;
-    const uniqueMap = new Map();
+    const raw = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    const uniqueMap = new Map<string, BlogPost>();
     raw.forEach((item: BlogPost) => {
       if (item && item.id) {
         uniqueMap.set(item.id, item);
@@ -258,8 +354,9 @@ export default function App() {
 
   const [services, setServices] = useState<Service[]>(() => {
     const saved = localStorage.getItem('tpx_services');
-    const raw = saved ? JSON.parse(saved) : DEFAULT_SERVICES;
-    const uniqueMap = new Map();
+    const raw = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    const uniqueMap = new Map<string, Service>();
     raw.forEach((item: Service) => {
       if (item && item.id) {
         uniqueMap.set(item.id, item);
@@ -270,8 +367,9 @@ export default function App() {
 
   const [leads, setLeads] = useState<Lead[]>(() => {
     const saved = localStorage.getItem('tpx_leads');
-    const raw = saved ? JSON.parse(saved) : DEFAULT_LEADS;
-    const uniqueMap = new Map();
+    const raw = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    const uniqueMap = new Map<string, Lead>();
     raw.forEach((item: Lead) => {
       const id = item.id || item.email || Math.random().toString();
       uniqueMap.set(id, item);
@@ -285,6 +383,8 @@ export default function App() {
   const [subRoute, setSubRoute] = useState<'dashboard' | 'admin' | 'visual' | 'crm'>('dashboard');
   const [adminActivePageId, setAdminActivePageId] = useState<string>('home');
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null);
 
   // Keep pages state in a ref to avoid recreating the hashchange listener and calling handleHashChange on every change/keystroke
   const pagesRef = React.useRef(pages);
@@ -312,7 +412,7 @@ export default function App() {
 
         if (moduleName === 'dashboard') {
           setSubRoute('dashboard');
-        } else if (moduleName === 'crm') {
+        } else if (moduleName === 'crm' || moduleName === 'policies') {
           setSubRoute('crm');
         } else if (moduleName === 'admin' && parts[2]) {
           setSubRoute('admin');
@@ -326,32 +426,30 @@ export default function App() {
       } else {
         setViewMode('live');
         // Decode public routes
-        const rawRoute = hash.replace(/^#(?:|\/)/, '').toLowerCase(); // e.g. "about" or "services" or "page-lms"
-
-        if (rawRoute === '' || rawRoute === 'home') {
-          setCurrentPageId('home');
-        } else if (rawRoute.startsWith('page-')) {
-          const pageId = rawRoute.replace('page-', '');
-          setCurrentPageId(pageId);
-        } else {
-          // Check if it's an existing page ID using ref to avoid dependency re-triggers
-          const exists = pagesRef.current.some(p => p.id === rawRoute);
-          if (exists) {
-            setCurrentPageId(rawRoute);
-          } else {
-            // Default fallback
-            setCurrentPageId('home');
-          }
-        }
+        const rawRoute = normalizeRoute(hash);
+        const matchedPageId = resolvePublicPageId(rawRoute, pagesRef.current) || 'home';
+        setCurrentPageId(matchedPageId);
       }
     };
 
     window.addEventListener('hashchange', handleHashChange);
-    // run once on initial mount
     handleHashChange();
 
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    const hash = window.location.hash || '#/';
+    const lowerHash = hash.toLowerCase();
+
+    if (lowerHash.startsWith('#/superadmin') || lowerHash.startsWith('#superadmin')) {
+      return;
+    }
+
+    const rawRoute = normalizeRoute(hash);
+    const matchedPageId = resolvePublicPageId(rawRoute, pagesRef.current) || 'home';
+    setCurrentPageId(matchedPageId);
+  }, [pages]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('tpx_superadmin_authed');
@@ -360,8 +458,64 @@ export default function App() {
     window.location.hash = '#/';
   };
 
+  const handleSaveVisualDraft = async () => {
+    setIsSavingDraft(true);
+    setSaveStatusMessage('Saving draft...');
+    try {
+      localStorage.setItem('tpx_pages', JSON.stringify(pages));
+      localStorage.setItem('tpx_settings', JSON.stringify(settings));
+      localStorage.setItem('tpx_media', JSON.stringify(media));
+      localStorage.setItem('tpx_placed_students', JSON.stringify(placedStudents));
+      localStorage.setItem('tpx_hiring_partners', JSON.stringify(hiringPartners));
+      localStorage.setItem('tpx_courses', JSON.stringify(courses));
+      localStorage.setItem('tpx_blogs', JSON.stringify(blogs));
+      localStorage.setItem('tpx_services', JSON.stringify(services));
+      localStorage.setItem('tpx_leads', JSON.stringify(leads));
+
+      const response = await fetch('/api/save-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pages,
+          settings,
+          media,
+          placed_students: placedStudents,
+          hiring_partners: hiringPartners,
+          courses,
+          blogs,
+          services,
+          leads
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setMongoDbStatus('connected');
+        setMongoDbError(null);
+        setSaveStatusMessage('Draft saved successfully.');
+      } else {
+        setMongoDbStatus('disconnected');
+        setSaveStatusMessage(result.msg || 'Save failed.');
+        if (result.connectionError) {
+          setMongoDbError(result.connectionError);
+        }
+      }
+    } catch (err: any) {
+      setSaveStatusMessage('Save failed. Check your connection.');
+      setMongoDbStatus('disconnected');
+      setMongoDbError(err.message || String(err));
+    } finally {
+      setIsSavingDraft(false);
+      window.setTimeout(() => {
+        setSaveStatusMessage(null);
+      }, 3000);
+    }
+  };
+
   const [mongoDbStatus, setMongoDbStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
   const [mongoDbError, setMongoDbError] = useState<string | null>(null);
+  const [mongoLoadComplete, setMongoLoadComplete] = useState(false);
 
   // Load all CMS collections from MongoDB on initial mount
   useEffect(() => {
@@ -373,49 +527,85 @@ export default function App() {
           const d = json.data;
           setMongoDbStatus('connected');
           setMongoDbError(null);
+
           if (d.pages && d.pages.length > 0) {
-            const uniqueMap = new Map();
+            const uniqueMap = new Map<string, CMSPage>();
             d.pages.forEach((p: any) => {
               if (p && p.id) {
                 uniqueMap.set(p.id, p);
               }
             });
             setPages(sanitizePages(Array.from(uniqueMap.values())));
+          } else {
+            setPages([EMPTY_PAGE]);
           }
-           if (d.settings && d.settings.logoText) setSettings(d.settings);
-          if (d.media && d.media.length > 0) setMedia(d.media);
+
+          const settingsDoc = Array.isArray(d.settings) ? d.settings[0] : d.settings;
+          if (settingsDoc && settingsDoc.logoText) {
+            const merged = { ...EMPTY_SETTINGS, ...settingsDoc } as GlobalSettings;
+            if (!merged.menuItems || merged.menuItems.length === 0) {
+              merged.menuItems = [];
+            }
+            setSettings(merged);
+          } else {
+            setSettings(EMPTY_SETTINGS);
+          }
+
+          if (d.media && d.media.length > 0) {
+            setMedia(d.media);
+          } else {
+            setMedia([]);
+          }
+
           if (d.placed_students && d.placed_students.length > 0) {
-            const m = new Map();
+            const m = new Map<string, PlacedStudent>();
             d.placed_students.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
             setPlacedStudents(Array.from(m.values()));
+          } else {
+            setPlacedStudents([]);
           }
+
           if (d.hiring_partners && d.hiring_partners.length > 0) {
             const m = new Map();
             d.hiring_partners.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
             setHiringPartners(Array.from(m.values()));
+          } else {
+            setHiringPartners([]);
           }
+
           if (d.courses && d.courses.length > 0) {
             const m = new Map();
             d.courses.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
             setCourses(Array.from(m.values()));
+          } else {
+            setCourses([]);
           }
+
           if (d.blogs && d.blogs.length > 0) {
             const m = new Map();
             d.blogs.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
             setBlogs(Array.from(m.values()));
+          } else {
+            setBlogs([]);
           }
+
           if (d.services && d.services.length > 0) {
             const m = new Map();
             d.services.forEach((item: any) => { if (item && item.id) m.set(item.id, item); });
             setServices(Array.from(m.values()));
+          } else {
+            setServices([]);
           }
+
           if (d.leads && d.leads.length > 0) {
-            const m = new Map();
+            const m = new Map<string, Lead>();
             d.leads.forEach((item: any) => {
               const id = item.id || item.email || Math.random().toString();
               m.set(id, item);
             });
             setLeads(Array.from(m.values()));
+          } else {
+            setLeads([]);
           }
         } else {
           setMongoDbStatus('disconnected');
@@ -427,6 +617,8 @@ export default function App() {
         console.error("Error loading data from MongoDB:", err);
         setMongoDbStatus('disconnected');
         setMongoDbError(err.message || String(err));
+      } finally {
+        setMongoLoadComplete(true);
       }
     };
     loadMongoDbData();
@@ -471,6 +663,8 @@ export default function App() {
 
   // Synchronize state changes to MongoDB (Debounced by 1500ms to avoid overlapping request floods)
   useEffect(() => {
+    if (!mongoLoadComplete) return;
+
     const delayDebounceFn = setTimeout(async () => {
       try {
         const response = await fetch('/api/save-all', {
@@ -514,18 +708,18 @@ export default function App() {
 
   // Reset database state callback
   const handleResetDatabase = () => {
-    const confirmReset = window.confirm("Are you sure you want to restore the Tantrapex demo database back to default themes, templates, and students?");
+    const confirmReset = window.confirm("Are you sure you want to clear local editor data and start from an empty CMS state?");
     if (confirmReset) {
       localStorage.clear();
-      setPages(DEFAULT_PAGES);
-      setSettings(DEFAULT_SETTINGS);
-      setMedia(DEFAULT_MEDIA);
-      setPlacedStudents(DEFAULT_PLACED_STUDENTS);
-      setHiringPartners(DEFAULT_HIRING_PARTNERS);
-      setCourses(DEFAULT_COURSES);
-      setBlogs(DEFAULT_BLOGS);
-      setServices(DEFAULT_SERVICES);
-      setLeads(DEFAULT_LEADS);
+      setPages([]);
+      setSettings(EMPTY_SETTINGS);
+      setMedia([]);
+      setPlacedStudents([]);
+      setHiringPartners([]);
+      setCourses([]);
+      setBlogs([]);
+      setServices([]);
+      setLeads([]);
       setCurrentPageId('home');
       setViewMode('live');
       setSelectedSectionId(null);
@@ -746,6 +940,39 @@ export default function App() {
             onEditField={handleEditField}
           />
         );
+      case 'lms':
+        return (
+          <DynamicSection
+            section={{
+              id: 'lms-fallback',
+              type: 'lms-dashboard',
+              title: 'UGSkill × TantraPex',
+              subtitle: 'Learning, Training & Placement Preparation — Together',
+              content: {},
+              design: {
+                backgroundColor: '#f8fafc',
+                textColor: '#0f172a',
+                headingColor: '#0f172a',
+                buttonColor: '#1d4ed8',
+                buttonHoverColor: '#1e40af',
+                buttonTextColor: '#ffffff',
+                borderRadius: '1rem',
+                paddingY: '2rem',
+                animation: 'fade',
+                cardBackgroundColor: '#ffffff',
+                borderColor: '#e2e8f0'
+              }
+            }}
+            viewMode="live"
+            onEditField={handleEditField}
+            allPlacedStudents={placedStudents}
+            allHiringPartners={hiringPartners}
+            allCourses={courses}
+            allBlogs={blogs}
+            onAddLead={handleAddLead}
+            settings={settings}
+          />
+        );
       case 'services':
         return (
           <PublicServicesPage
@@ -799,6 +1026,18 @@ export default function App() {
             onEditField={handleEditField}
           />
         );
+      case 'privacy':
+        return <PolicyPage initialTab="privacy" settings={settings} />;
+      case 'terms':
+      case 'terms-of-service':
+      case 'terms-of-use':
+        return <PolicyPage initialTab="terms" settings={settings} />;
+      case 'disclaimer':
+        return <PolicyPage initialTab="disclaimer" settings={settings} />;
+      case 'refund-policy':
+      case 'cancellation-refund':
+      case 'refund':
+        return <PolicyPage initialTab="refund" settings={settings} />;
       default:
         return (
           <div className="w-full flex flex-col">
@@ -905,6 +1144,8 @@ export default function App() {
             onEditField={handleEditFieldOnPage}
             onMoveSection={handleMoveSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
+            media={media}
+            setMedia={setMedia}
           />
         );
       case 'about':
@@ -967,6 +1208,8 @@ export default function App() {
             onEditField={handleEditFieldOnPage}
             onMoveSection={handleMoveSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
+            media={media}
+            setMedia={setMedia}
           />
         );
     }
@@ -1267,7 +1510,7 @@ export default function App() {
     }
   };
 
-  const activePage = pages.find(p => p.id === currentPageId) || pages[0];
+  const activePage = pages.find(p => p.id === currentPageId) || pages[0] || EMPTY_PAGE;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-text">
@@ -1356,12 +1599,16 @@ export default function App() {
                   setSubRoute('crm');
                   window.location.hash = '#/superadmin/crm';
                 }}
+                onOpenPoliciesAdmin={() => {
+                  setViewMode('superadmin');
+                  setSubRoute('crm');
+                  window.location.hash = '#/superadmin/policies';
+                }}
               />
             )}
 
             {subRoute === 'admin' && (
               <div className="flex-1 flex flex-col min-h-0">
-                {/* Embedded dynamic admin header toolbar */}
                 <div className="bg-slate-950 border-b border-slate-800 px-6 py-3 flex items-center justify-between text-white">
                   <div className="flex items-center gap-3">
                     <button 
@@ -1387,24 +1634,45 @@ export default function App() {
                     <div className="h-4 w-px bg-slate-800" />
                     <span className="text-xs font-semibold text-slate-400">Editing Document: <strong className="text-white uppercase font-mono">{adminActivePageId}</strong></span>
                   </div>
-                  {mongoDbStatus === 'connected' ? (
-                    <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-mono bg-emerald-950/40 border border-emerald-900 px-2.5 py-1 rounded">
-                      <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-ping" />
-                      <span>MongoDB Connected</span>
-                    </div>
-                  ) : mongoDbStatus === 'loading' ? (
-                    <div className="flex items-center gap-2 text-[10px] text-amber-400 font-mono bg-amber-950/40 border border-amber-900 px-2.5 py-1 rounded">
-                      <span className="h-1.5 w-1.5 bg-amber-400 rounded-full animate-pulse" />
-                      <span>Connecting MongoDB...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono bg-slate-950 border border-slate-800 px-2.5 py-1 rounded">
-                      <span className="h-1.5 w-1.5 bg-slate-500 rounded-full" />
-                      <span>MongoDB Disconnected</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {mongoDbStatus === 'connected' ? (
+                      <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-mono bg-emerald-950/40 border border-emerald-900 px-2.5 py-1 rounded">
+                        <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-ping" />
+                        <span>MongoDB Synced</span>
+                      </div>
+                    ) : mongoDbStatus === 'loading' ? (
+                      <div className="flex items-center gap-2 text-[10px] text-amber-400 font-mono bg-amber-950/40 border border-amber-900 px-2.5 py-1 rounded">
+                        <span className="h-1.5 w-1.5 bg-amber-400 rounded-full animate-pulse" />
+                        <span>Connecting MongoDB...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono bg-slate-950 border border-slate-800 px-2.5 py-1 rounded">
+                        <span className="h-1.5 w-1.5 bg-slate-500 rounded-full" />
+                        <span>MongoDB Disconnected</span>
+                      </div>
+                    )}
+                    <button 
+                      onClick={handleSaveVisualDraft}
+                      disabled={isSavingDraft}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-400 border border-blue-700 hover:border-blue-800 text-xs text-white rounded-lg transition-colors font-semibold cursor-pointer"
+                      title="Save current admin draft"
+                    >
+                      {isSavingDraft ? 'Saving...' : 'Save Draft'}
+                    </button>
+                    <button 
+                      onClick={handleResetDatabase}
+                      className="px-3 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-rose-400 hover:text-rose-300 rounded-lg transition-colors font-semibold cursor-pointer"
+                      title="Reset database to original static templates"
+                    >
+                      Reset Draft Data
+                    </button>
+                  </div>
                 </div>
-
+                {saveStatusMessage && (
+                  <div className="px-6 py-3 bg-slate-900 text-slate-100 text-xs rounded-b-lg">
+                    {saveStatusMessage}
+                  </div>
+                )}
                 {renderAdminContentPage()}
               </div>
             )}
@@ -1455,6 +1723,14 @@ export default function App() {
                       </div>
                     )}
                     <button 
+                      onClick={handleSaveVisualDraft}
+                      disabled={isSavingDraft}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-400 border border-blue-700 hover:border-blue-800 text-xs text-white rounded-lg transition-colors font-semibold cursor-pointer"
+                      title="Save current visual editor draft"
+                    >
+                      {isSavingDraft ? 'Saving...' : 'Save Draft'}
+                    </button>
+                    <button 
                       onClick={handleResetDatabase}
                       className="px-3 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-rose-400 hover:text-rose-300 rounded-lg transition-colors font-semibold cursor-pointer"
                       title="Reset database to original static templates"
@@ -1463,6 +1739,11 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+                {saveStatusMessage && (
+                  <div className="mt-2 px-3 py-2 bg-slate-900 text-slate-100 text-xs rounded-lg inline-block">
+                    {saveStatusMessage}
+                  </div>
+                )}
 
                 {renderVisualEditorPage()}
               </div>

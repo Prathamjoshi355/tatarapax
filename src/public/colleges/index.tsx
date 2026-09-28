@@ -25,7 +25,7 @@ const DEFAULT_COLLEGE_SECTIONS = [
     title: "Partner With Us",
     subtitle: "We work with colleges to provide better career opportunities",
     content: {
-      badgeText: "9. COLLEGE PARTNERSHIP",
+        badgeText: " ",
       brochureBtnText: "Download Brochure",
       brochureBtnLink: "#",
       registerBtnText: "Register Your College",

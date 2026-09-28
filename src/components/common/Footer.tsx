@@ -15,6 +15,14 @@ export default function Footer({
   setCurrentPageId,
   viewMode
 }: FooterProps) {
+  const navigateToPage = (pageId: string) => {
+    const nextHash = pageId === 'home' ? '#/' : `#/${pageId}`;
+    if (window.location.hash === nextHash) {
+      window.dispatchEvent(new Event('hashchange'));
+      return;
+    }
+    window.location.hash = nextHash;
+  };
   if (viewMode === 'admin') return null;
 
   // Resolve and sort menu items for footer quick links
@@ -36,9 +44,7 @@ export default function Footer({
         {/* Company Summary Column */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 bg-white text-[#071B4D] rounded-lg flex items-center justify-center font-display font-black text-xl shadow-md">
-              TP
-            </div>
+            <img src="https://res.cloudinary.com/dhy9pmo8s/image/upload/v1783025553/Untitled_design_3_hez3tf.png" alt="" className="h-10 w-10" />
             <div className="flex flex-col">
               <span className="font-display font-bold text-base text-white tracking-tight uppercase leading-none">
                 {settings.logoText || "TANTRAPEX"}
@@ -92,7 +98,7 @@ export default function Footer({
               <li key={item.id}>
                 <button
                   onClick={() => {
-                    setCurrentPageId(item.pageId);
+                    navigateToPage(item.pageId);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="hover:text-[#F7C400] transition-colors text-left font-medium"
@@ -162,10 +168,50 @@ export default function Footer({
           <span>
             &copy; 2026 Tantrapex Career Development and Placement Consultancy. All rights reserved.
           </span>
-          <span className="flex items-center gap-3">
-            <a href="#privacy" className="hover:text-[#F7C400]">Privacy Policy</a>
+          <span className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <button
+              onClick={() => {
+                navigateToPage('privacy');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#F7C400] transition-colors cursor-pointer"
+            >
+              Privacy Policy
+            </button>
             <span>&bull;</span>
-            <a href="#terms" className="hover:text-[#F7C400]">Terms of Use</a>
+            <button
+              onClick={() => {
+                navigateToPage('terms');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#F7C400] transition-colors cursor-pointer"
+            >
+              Terms of Service
+            </button>
+            <span>&bull;</span>
+            <button
+              onClick={() => {
+                navigateToPage('disclaimer');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#F7C400] transition-colors cursor-pointer"
+            >
+              Disclaimer
+            </button>
+            <span>&bull;</span>
+            <button
+              onClick={() => {
+                navigateToPage('refund-policy');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#F7C400] transition-colors cursor-pointer"
+            >
+              Cancellation & Refund Policy
+            </button>
+            <span>&bull;</span>
+            <a href="#/superadmin/dashboard" className="hover:text-[#F7C400] font-bold text-slate-300">
+              Control Panel
+            </a>
           </span>
         </div>
       </div>

@@ -272,24 +272,96 @@ export default function AdminServicesPage({
                                 No services found. Click "Add New Service" to insert one.
                               </div>
                             ) : (
-                              activeSection.content.services.map((serv: any, idx: number) => (
-                                <div key={serv.id || idx} className="p-4 bg-slate-900/80 border border-slate-800/80 rounded-xl flex flex-col gap-3 font-sans">
-                                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                                    <span className="text-xs font-bold text-slate-300">Service #{idx + 1} - {serv.title || 'Untitled'}</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (window.confirm(`Are you sure you want to delete service "${serv.title || 'Untitled'}"?`)) {
-                                          const newList = activeSection.content.services.filter((_: any, sidx: number) => sidx !== idx);
-                                          onEditField(activeSection.id, 'content.services', newList);
-                                        }
-                                      }}
-                                      className="text-rose-400 hover:text-rose-300 p-1 bg-rose-950/30 hover:bg-rose-950/60 rounded transition-colors"
-                                      title="Delete Service Card"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
+                              activeSection.content.services.map((serv: any, idx: number) => {
+                                const totalServices = activeSection.content.services.length;
+                                return (
+                                  <div key={serv.id || idx} className="p-4 bg-slate-900/80 border border-slate-800/80 rounded-xl flex flex-col gap-3 font-sans">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-black text-blue-400 bg-blue-950/80 border border-blue-800/60 px-2 py-0.5 rounded">
+                                          #{idx + 1}
+                                        </span>
+                                        <span className="text-xs font-bold text-slate-300 truncate max-w-[180px] sm:max-w-[240px]">
+                                          {serv.title || 'Untitled Service'}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 ml-auto">
+                                        {/* Position Selector Dropdown */}
+                                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                          <span className="text-[10px] font-bold text-slate-400 uppercase">Pos:</span>
+                                          <select
+                                            value={idx}
+                                            onChange={(e) => {
+                                              const newTargetIdx = parseInt(e.target.value, 10);
+                                              if (isNaN(newTargetIdx) || newTargetIdx === idx) return;
+                                              const list = [...activeSection.content.services];
+                                              const itemToMove = list.splice(idx, 1)[0];
+                                              list.splice(newTargetIdx, 0, itemToMove);
+                                              onEditField(activeSection.id, 'content.services', list);
+                                            }}
+                                            className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
+                                          >
+                                            {Array.from({ length: totalServices }).map((_, posIdx) => (
+                                              <option key={posIdx} value={posIdx} className="bg-slate-900 text-white">
+                                                Position #{posIdx + 1}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        {/* Move Up Button */}
+                                        <button
+                                          type="button"
+                                          disabled={idx === 0}
+                                          onClick={() => {
+                                            if (idx === 0) return;
+                                            const list = [...activeSection.content.services];
+                                            const temp = list[idx - 1];
+                                            list[idx - 1] = list[idx];
+                                            list[idx] = temp;
+                                            onEditField(activeSection.id, 'content.services', list);
+                                          }}
+                                          className="p-1.5 bg-slate-800 hover:bg-blue-600 disabled:opacity-30 disabled:hover:bg-slate-800 text-slate-200 hover:text-white rounded transition-colors"
+                                          title="Move Up in Sequence"
+                                        >
+                                          <MoveUp className="h-3.5 w-3.5" />
+                                        </button>
+
+                                        {/* Move Down Button */}
+                                        <button
+                                          type="button"
+                                          disabled={idx === totalServices - 1}
+                                          onClick={() => {
+                                            if (idx === totalServices - 1) return;
+                                            const list = [...activeSection.content.services];
+                                            const temp = list[idx + 1];
+                                            list[idx + 1] = list[idx];
+                                            list[idx] = temp;
+                                            onEditField(activeSection.id, 'content.services', list);
+                                          }}
+                                          className="p-1.5 bg-slate-800 hover:bg-blue-600 disabled:opacity-30 disabled:hover:bg-slate-800 text-slate-200 hover:text-white rounded transition-colors"
+                                          title="Move Down in Sequence"
+                                        >
+                                          <MoveDown className="h-3.5 w-3.5" />
+                                        </button>
+
+                                        {/* Delete Button */}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (window.confirm(`Are you sure you want to delete service "${serv.title || 'Untitled'}"?`)) {
+                                              const newList = activeSection.content.services.filter((_: any, sidx: number) => sidx !== idx);
+                                              onEditField(activeSection.id, 'content.services', newList);
+                                            }
+                                          }}
+                                          className="text-rose-400 hover:text-rose-300 p-1.5 bg-rose-950/30 hover:bg-rose-950/60 rounded transition-colors ml-1"
+                                          title="Delete Service Card"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
 
                                   <div className="grid grid-cols-1 gap-4">
                                     <div className="flex flex-col gap-1.5">
@@ -320,8 +392,9 @@ export default function AdminServicesPage({
                                     />
                                   </div>
                                 </div>
-                              ))
-                            )}
+                              );
+                            })
+                          )}
                           </div>
                         </div>
                       )}
