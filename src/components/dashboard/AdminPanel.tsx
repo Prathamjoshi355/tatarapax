@@ -562,7 +562,7 @@ export default function AdminPanel({
               { id: 'workshop-registrations', label: 'Workshop Registrations', icon: Ticket },
               { id: 'plan-purchases', label: 'Plan Purchases CRM', icon: CreditCard },
               { id: 'media', label: 'Media asset library', icon: Image },
-              { id: 'lms-cms', label: 'Student LMS Portal CMS', icon: GraduationCap },
+              { id: 'lms-cms', label: 'UGSkill Collaboration CMS', icon: GraduationCap },
               { id: 'ambassador-cms', label: 'Campus Ambassador CMS', icon: Megaphone },
               { id: 'settings', label: 'Global branding settings', icon: Settings }
             ].map((tab) => {
@@ -3150,85 +3150,253 @@ export default function AdminPanel({
           </div>
         )}
 
-        {/* TAB: STUDENT LMS PORTAL CMS */}
+        {/* TAB: UGSKILL COLLABORATION PAGE CMS */}
         {activeTab === 'lms-cms' && (() => {
           const lmsPage = pages.find(p => p.id === 'lms');
           const lmsSection = lmsPage?.sections.find(s => s.type === 'lms-dashboard');
           const lmsContent = lmsSection?.content || {};
-
-          // Extract content with default values
-          const sName = lmsContent.studentName || "Pratham Joshi";
-          const sId = lmsContent.studentId || "TPX-2026-089";
-          const nText = lmsContent.notificationText || "Reminder: Upcoming Live Class on Aptitude - Percentage begins in 15 minutes.";
-
-          const cIconUrl = lmsContent.coursesIconUrl || "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&q=80&w=150";
-          const cLabel = lmsContent.coursesLabel || "My Courses";
-          const cVal = lmsContent.coursesValue || "5 Enrolled";
-
-          const clIconUrl = lmsContent.classesIconUrl || "https://images.unsplash.com/photo-1610484826967-09c5720778c7?auto=format&fit=crop&q=80&w=150";
-          const clLabel = lmsContent.classesLabel || "Live Classes";
-          const clVal = lmsContent.classesValue || "2 Upcoming";
-
-          const aIconUrl = lmsContent.assignmentsIconUrl || "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?auto=format&fit=crop&q=80&w=150";
-          const aLabel = lmsContent.assignmentsLabel || "Assignments";
-          const aVal = lmsContent.assignmentsValue || "3 Pending";
-
-          const tIconUrl = lmsContent.testsIconUrl || "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=150";
-          const tLabel = lmsContent.testsLabel || "Mock Tests";
-          const tVal = lmsContent.testsValue || "4 Pending";
-
-          const progItems = lmsContent.progressItems || [
-            { name: "Java Programming", progress: 75 },
-            { name: "Web Development", progress: 50 },
-            { name: "Aptitude Training", progress: 100 }
+          const update = (fields: Record<string, any>) => {
+            setPages(previous => {
+              const page = previous.find(item => item.id === 'lms');
+              const newSection = {
+                id: 'lms-collaboration', type: 'lms-dashboard', title: 'UGSkill × TantraPex',
+                subtitle: 'Learning, Training & Placement Preparation — Together', content: fields,
+                design: { backgroundColor: '#ffffff', textColor: '#334155', headingColor: '#071B4D', buttonColor: '#071B4D', buttonHoverColor: '#00103a', buttonTextColor: '#ffffff', borderRadius: '1rem', paddingY: '2rem', animation: 'fade' as const, cardBackgroundColor: '#f8fafc', borderColor: '#e2e8f0' }
+              };
+              if (!page) {
+                return [...previous, { id: 'lms', title: 'UGSkill Collaboration', slug: '/lms', seo: { title: 'UGSkill Collaboration', description: '', keywords: '' }, sections: [newSection] }];
+              }
+              let updated = false;
+              const sections = page.sections.map(section => {
+                if (section.type !== 'lms-dashboard') return section;
+                updated = true;
+                return { ...section, content: { ...(section.content || {}), ...fields } };
+              });
+              if (!updated) sections.push(newSection);
+              return previous.map(item => item.id === 'lms' ? { ...item, sections } : item);
+            });
+          };
+          const value = (key: string, fallback: string) => String(lmsContent[key] ?? fallback);
+          const input = (label: string, key: string, fallback: string, multiline = false) => (
+            <label className="flex flex-col gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+              {label}
+              {multiline ? (
+                <textarea rows={3} value={value(key, fallback)} onChange={e => update({ [key]: e.target.value })} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+              ) : (
+                <input value={value(key, fallback)} onChange={e => update({ [key]: e.target.value })} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+              )}
+            </label>
+          );
+          const image = (label: string, key: string, fallback: string) => (
+            <UniversalImageUploaderLight label={label} value={value(key, fallback)} onChange={url => update({ [key]: url })} />
+          );
+          const features = Array.isArray(lmsContent.features) ? lmsContent.features : ['Structured Learning', 'Practice & Assessments', 'Skill Development', 'Placement Preparation'];
+          const defaultJourney = ['Learn', 'Practice', 'Improve', 'Prepare', 'Perform'];
+          const journey = Array.isArray(lmsContent.journeySteps) ? lmsContent.journeySteps : defaultJourney;
+          const faculty = Array.isArray(lmsContent.facultyCards) ? lmsContent.facultyCards : [
+            { itemNo: '01', domain: 'Training', name: '[TRAINING FACULTY NAME]', designation: 'Training Faculty', description: "Faculty-led training sessions designed to strengthen students' practical knowledge, professional skills and understanding of real-world requirements.", image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200', reverse: false },
+            { itemNo: '02', domain: 'Coding', name: '[CODING FACULTY NAME]', designation: 'Coding Faculty', description: 'Technical sessions focused on programming fundamentals, problem-solving, coding practice and the skills required for technical placement opportunities.', image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1200', reverse: true },
+            { itemNo: '03', domain: 'Aptitude', name: '[APTITUDE FACULTY NAME]', designation: 'Aptitude Faculty', description: 'Structured aptitude preparation covering logical reasoning, quantitative ability and problem-solving skills commonly required in placement assessments.', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1200', reverse: false }
           ];
+          const defaultHeroImage = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200';
+          const defaultUgLogo = 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1790320751/1779608301561_hwpzap.jpg';
+          const defaultTantraLogo = 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1783025553/Untitled_design_3_hez3tf.png';
 
-          const liveTitle = lmsContent.liveClassTitle || "Aptitude - Percentage";
-          const liveInst = lmsContent.liveClassInstructor || "By Ravi Sir";
-          const liveSch = lmsContent.liveClassSchedule || "Tomorrow, 11:00 AM";
-          const liveBtn = lmsContent.liveClassBtnText || "Join Class";
+          return (
+            <div className="flex max-w-5xl flex-col gap-6 text-left text-xs font-sans">
+              <header>
+                <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900">UGSKILL COLLABORATION PAGE</h1>
+                <p className="mt-1 text-slate-500">Changes appear on the public LMS collaboration page and are saved with the page content.</p>
+              </header>
 
-          const vidThumbnail = lmsContent.videoThumbnailUrl || "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=600";
-          const vidUrl = lmsContent.videoUrl || "https://www.youtube.com";
+              <section className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 md:grid-cols-2">
+                <h2 className="md:col-span-2 font-display font-bold text-slate-800 text-sm">Hero and partner identities</h2>
+                {input('Collaboration badge', 'collaborationBadge', 'COLLABORATION')}
+                {input('Left partner name', 'partnerLeft', 'UGSkill')}
+                {input('Right partner name', 'partnerRight', 'TantraPex')}
+                {input('Hero subtitle', 'heroSubtitle', 'Learning, Training & Placement Preparation — Together', true)}
+                {input('Hero description', 'heroDescription', 'TantraPex has collaborated with UGSkill, a NexisparkX product, to provide students with continuous faculty-led learning, technical training and placement preparation.', true)}
+                {image('UGSkill logo', 'ugLogo', defaultUgLogo)}
+                {image('TantraPex logo', 'tantraLogo', defaultTantraLogo)}
+                {image('Hero photo', 'heroImage', defaultHeroImage)}
+                {input('UGSkill display name', 'ugName', 'UG Skill')}
+                {input('UGSkill caption', 'ugCaption', 'A NexisparkX Product')}
+                {input('TantraPex display name', 'tantraName', 'TantraPex')}
+                {input('TantraPex caption', 'tantraCaption', 'Faculty-led learning')}
+              </section>
 
-          const gLogoUrl = lmsContent.googleLogoUrl || "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg";
-          const gRating = lmsContent.googleRating || "4.8";
-          const gReviews = lmsContent.googleReviewsText || "Based on 500+ Reviews";
-          const gBtn = lmsContent.googleBtnText || "Read Reviews";
-          const gLink = lmsContent.googleReviewsLink || "https://google.com";
+              <section className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 md:grid-cols-2">
+                <h2 className="md:col-span-2 font-display font-bold text-slate-800 text-sm">Powered-by and collaboration copy</h2>
+                {input('Powered-by description', 'poweredDescription', 'UGSkill is a NexisparkX product built to help students strengthen their skills through structured learning, assessments, practice and placement-focused preparation.', true)}
+                {input('Collaboration eyebrow', 'collaborationEyebrow', 'OUR COLLABORATION')}
+                {input('Collaboration heading', 'collaborationTitle', 'TantraPex × UGSkill Collaboration')}
+                {input('Collaboration description', 'collaborationDescription', 'Through this collaboration, UGSkill provides continuous faculty support to TantraPex, offering structured training, technical learning and placement preparation for students.', true)}
+                <div className="md:col-span-2 grid gap-3 sm:grid-cols-2">
+                  {['Structured Learning', 'Practice & Assessments', 'Skill Development', 'Placement Preparation'].map((fallback, index) => (
+                    <label key={index} className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                      Feature {index + 1}
+                      <input value={features[index] ?? fallback} onChange={e => {
+                        const updated = [...features];
+                        updated[index] = e.target.value;
+                        update({ features: updated });
+                      }} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+                    </label>
+                  ))}
+                </div>
+              </section>
 
-          const recentActs = lmsContent.recentActivities || [
-            { id: "act-1", title: "Java Basics", type: "Live Class", status: "Completed", date: "10 May 2024", image: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-2", title: "Data Structures", type: "Assignment", status: "Submitted", date: "09 May 2024", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-3", title: "Aptitude Mock Test 1", type: "Mock Test", status: "In Progress", date: "09 May 2024", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-4", title: "Resume Building", type: "Live Class", status: "Completed", date: "08 May 2024", image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-5", title: "Interview Skills", type: "Live Class", status: "Upcoming", date: "11 May 2024", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=200" }
+              <section className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-display font-bold text-slate-800 text-sm">Faculty profiles</h2>
+                  <button type="button" onClick={() => update({ facultyCards: [...faculty, { itemNo: String(faculty.length + 1).padStart(2, '0'), domain: '', name: '', designation: '', description: '', image: '', reverse: faculty.length % 2 === 1 }] })} className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-bold text-slate-700 hover:bg-slate-50"><Plus className="h-4 w-4" />Add faculty</button>
+                </div>
+                {faculty.map((item: any, index: number) => (
+                  <div key={index} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2 flex justify-between text-[10px] font-bold uppercase text-slate-500">Faculty {index + 1}<button type="button" aria-label={`Remove faculty ${index + 1}`} onClick={() => update({ facultyCards: faculty.filter((_: any, idx: number) => idx !== index) })} className="text-rose-600 hover:text-rose-800"><Trash2 className="h-4 w-4" /></button></div>
+                    {(['domain', 'name', 'designation', 'description'] as const).map(field => (
+                      <label key={field} className={`flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 ${field === 'description' ? 'sm:col-span-2' : ''}`}>
+                        {field}
+                        {field === 'description' ? (
+                          <textarea rows={3} value={item[field] || ''} onChange={e => update({ facultyCards: faculty.map((card: any, idx: number) => idx === index ? { ...card, [field]: e.target.value } : card) })} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+                        ) : (
+                          <input value={item[field] || ''} onChange={e => update({ facultyCards: faculty.map((card: any, idx: number) => idx === index ? { ...card, [field]: e.target.value } : card) })} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+                        )}
+                      </label>
+                    ))}
+                    <div className="sm:col-span-2"><UniversalImageUploaderLight label="Faculty image" value={item.image || ''} onChange={url => update({ facultyCards: faculty.map((card: any, idx: number) => idx === index ? { ...card, image: url } : card) })} /></div>
+                  </div>
+                ))}
+              </section>
+
+              <section className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 md:grid-cols-2">
+                <h2 className="md:col-span-2 font-display font-bold text-slate-800 text-sm">Learning journey and closing banner</h2>
+                {input('Journey heading', 'journeyTitle', 'From Learning to Placement')}
+                {input('Journey subtitle', 'journeySubtitle', 'A continuous journey toward becoming placement-ready.', true)}
+                {defaultJourney.map((fallback, index) => (
+                  <label key={fallback} className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                    Journey step {index + 1}
+                    <input value={journey[index] ?? fallback} onChange={e => {
+                      const updated = [...journey];
+                      updated[index] = e.target.value;
+                      update({ journeySteps: updated });
+                    }} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+                  </label>
+                ))}
+                {input('Closing heading', 'closingTitle', 'Building Placement-Ready Students Together')}
+                {input('Closing description', 'closingDescription', 'Through the collaboration between TantraPex and UGSkill, students receive continuous guidance, technical training and aptitude preparation to help them move confidently toward placement opportunities.', true)}
+                {image('Closing banner photo', 'closingImage', defaultHeroImage)}
+              </section>
+            </div>
+          );
+        })()}
+
+        {/* TAB: LEGACY STUDENT DASHBOARD SETTINGS */}
+        {activeTab === 'lms-legacy' && (() => {
+          const lmsPage = pages.find(p => p.id === 'lms');
+          const lmsSection = lmsPage?.sections.find(s => s.type === 'lms-dashboard');
+          const lmsContent = lmsSection?.content || {};
+          const sName = lmsContent.studentName || 'Student';
+          const sId = lmsContent.studentId || '';
+          const nText = lmsContent.notificationText || '';
+          const cLabel = lmsContent.coursesLabel || '';
+          const cVal = lmsContent.coursesValue || '';
+          const cIconUrl = lmsContent.coursesIconUrl || '';
+          const clLabel = lmsContent.classesLabel || '';
+          const clVal = lmsContent.classesValue || '';
+          const clIconUrl = lmsContent.classesIconUrl || '';
+          const aLabel = lmsContent.assignmentsLabel || '';
+          const aVal = lmsContent.assignmentsValue || '';
+          const aIconUrl = lmsContent.assignmentsIconUrl || '';
+          const tLabel = lmsContent.testsLabel || '';
+          const tVal = lmsContent.testsValue || '';
+          const tIconUrl = lmsContent.testsIconUrl || '';
+          const progItems = lmsContent.progressItems || [];
+          const liveTitle = lmsContent.liveClassTitle || '';
+          const liveInst = lmsContent.liveClassInstructor || '';
+          const liveSch = lmsContent.liveClassSchedule || '';
+          const vidThumbnail = lmsContent.videoThumbnailUrl || '';
+          const vidUrl = lmsContent.videoUrl || '';
+          const gLogoUrl = lmsContent.googleLogoUrl || '';
+          const gRating = lmsContent.googleRating || '';
+          const gReviews = lmsContent.googleReviewsText || '';
+          const recentActs = lmsContent.recentActivities || [];
+
+          const lmsDefaults: Record<string, string> = {
+            collaborationBadge: 'COLLABORATION', partnerLeft: 'UGSkill', partnerRight: 'TantraPex',
+            heroSubtitle: 'Learning, Training & Placement Preparation — Together',
+            heroDescription: 'TantraPex has collaborated with UGSkill, a NexisparkX product, to provide students with continuous faculty-led learning, technical training and placement preparation.',
+            ugLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1790320751/1779608301561_hwpzap.jpg',
+            ugName: 'UG Skill', ugCaption: 'A NexisparkX Product',
+            tantraLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1783025553/Untitled_design_3_hez3tf.png',
+            tantraName: 'TantraPex', tantraCaption: 'Faculty-led learning',
+            heroImage: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200',
+            poweredDescription: 'UGSkill is a NexisparkX product built to help students strengthen their skills through structured learning, assessments, practice and placement-focused preparation.',
+            collaborationEyebrow: 'OUR COLLABORATION',
+            collaborationTitle: 'TantraPex × UGSkill Collaboration',
+            collaborationDescription: 'Through this collaboration, UGSkill provides continuous faculty support to TantraPex, offering structured training, technical learning and placement preparation for students.',
+            journeyTitle: 'From Learning to Placement',
+            journeySubtitle: 'A continuous journey toward becoming placement-ready.',
+            closingTitle: 'Building Placement-Ready Students Together',
+            closingDescription: 'Through the collaboration between TantraPex and UGSkill, students receive continuous guidance, technical training and aptitude preparation to help them move confidently toward placement opportunities.'
+          };
+          const defaultFeatures = ['Structured Learning', 'Practice & Assessments', 'Skill Development', 'Placement Preparation'];
+          const defaultJourney = ['Learn', 'Practice', 'Improve', 'Prepare', 'Perform'];
+          const facultyDefaults = [
+            { itemNo: '01', domain: 'Training', name: '[TRAINING FACULTY NAME]', designation: 'Training Faculty', description: "Faculty-led training sessions designed to strengthen students' practical knowledge, professional skills and understanding of real-world requirements.", image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200', reverse: false },
+            { itemNo: '02', domain: 'Coding', name: '[CODING FACULTY NAME]', designation: 'Coding Faculty', description: 'Technical sessions focused on programming fundamentals, problem-solving, coding practice and the skills required for technical placement opportunities.', image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1200', reverse: true },
+            { itemNo: '03', domain: 'Aptitude', name: '[APTITUDE FACULTY NAME]', designation: 'Aptitude Faculty', description: 'Structured aptitude preparation covering logical reasoning, quantitative ability and problem-solving skills commonly required in placement assessments.', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1200', reverse: false }
           ];
+          const featureItems = Array.isArray(lmsContent.features) ? lmsContent.features : defaultFeatures;
+          const journeyItems = Array.isArray(lmsContent.journeySteps) ? lmsContent.journeySteps : defaultJourney;
+          const facultyItems = Array.isArray(lmsContent.facultyCards) ? lmsContent.facultyCards : facultyDefaults;
 
           const handleUpdateLms = (updatedFields: any) => {
             setPages(prevPages => {
-              return prevPages.map(page => {
-                if (page.id === 'lms') {
-                  return {
-                    ...page,
-                    sections: page.sections.map(section => {
-                      if (section.type === 'lms-dashboard') {
-                        return {
-                          ...section,
-                          content: {
-                            ...section.content,
-                            ...updatedFields
-                          }
-                        };
-                      }
-                      return section;
-                    })
-                  };
-                }
-                return page;
+              const lmsPage = prevPages.find(page => page.id === 'lms');
+              if (!lmsPage) {
+                return [...prevPages, {
+                  id: 'lms', title: 'UGSkill Collaboration', slug: '/lms',
+                  seo: { title: 'UGSkill Collaboration', description: '', keywords: '' },
+                  sections: [{
+                    id: 'lms-collaboration', type: 'lms-dashboard', title: 'UGSkill × TantraPex',
+                    subtitle: 'Learning, Training & Placement Preparation — Together', content: updatedFields,
+                    design: { backgroundColor: '#ffffff', textColor: '#334155', headingColor: '#071B4D', buttonColor: '#071B4D', buttonHoverColor: '#00103a', buttonTextColor: '#ffffff', borderRadius: '1rem', paddingY: '2rem', animation: 'fade', cardBackgroundColor: '#f8fafc', borderColor: '#e2e8f0' }
+                  }]
+                }];
+              }
+
+              let foundSection = false;
+              const updatedSections = lmsPage.sections.map(section => {
+                if (section.type !== 'lms-dashboard') return section;
+                foundSection = true;
+                return { ...section, content: { ...(section.content || {}), ...updatedFields } };
               });
+              if (!foundSection) {
+                updatedSections.push({
+                  id: 'lms-collaboration', type: 'lms-dashboard', title: 'UGSkill × TantraPex',
+                  subtitle: 'Learning, Training & Placement Preparation — Together', content: updatedFields,
+                  design: { backgroundColor: '#ffffff', textColor: '#334155', headingColor: '#071B4D', buttonColor: '#071B4D', buttonHoverColor: '#00103a', buttonTextColor: '#ffffff', borderRadius: '1rem', paddingY: '2rem', animation: 'fade', cardBackgroundColor: '#f8fafc', borderColor: '#e2e8f0' }
+                });
+              }
+              return prevPages.map(page => page.id === 'lms' ? { ...page, sections: updatedSections } : page);
             });
           };
+
+          const updateFaculty = (index: number, field: string, value: string) => {
+            const updated = facultyItems.map((item: any, itemIndex: number) => itemIndex === index ? { ...item, [field]: value } : item);
+            handleUpdateLms({ facultyCards: updated });
+          };
+
+          const textField = (label: string, field: string, multiline = false) => (
+            <label className="flex flex-col gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+              {label}
+              {multiline ? (
+                <textarea rows={3} value={lmsContent[field] ?? lmsDefaults[field] ?? ''} onChange={(e) => handleUpdateLms({ [field]: e.target.value })} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+              ) : (
+                <input type="text" value={lmsContent[field] ?? lmsDefaults[field] ?? ''} onChange={(e) => handleUpdateLms({ [field]: e.target.value })} className="px-3 py-2 normal-case font-normal tracking-normal bg-white border border-slate-200 rounded text-slate-800" />
+              )}
+            </label>
+          );
 
           return (
             <div className="flex flex-col gap-6 text-left text-xs font-sans max-w-4xl">

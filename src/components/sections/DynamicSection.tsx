@@ -2524,56 +2524,15 @@ export default function DynamicSection({
 
         {/* 15. STUDENT LMS DASHBOARD */}
         {type === 'lms-dashboard' && (() => {
-          // Extract content with default values
-          const sName = content.studentName || "Pratham Joshi";
-          const sId = content.studentId || "TPX-2026-089";
-          const nText = content.notificationText || "Reminder: Upcoming Live Class on Aptitude - Percentage begins in 15 minutes.";
-
-          const cIconUrl = content.coursesIconUrl || "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&q=80&w=150";
-          const cLabel = content.coursesLabel || "My Courses";
-          const cVal = content.coursesValue || "5 Enrolled";
-
-          const clIconUrl = content.classesIconUrl || "https://images.unsplash.com/photo-1610484826967-09c5720778c7?auto=format&fit=crop&q=80&w=150";
-          const clLabel = content.classesLabel || "Live Classes";
-          const clVal = content.classesValue || "2 Upcoming";
-
-          const aIconUrl = content.assignmentsIconUrl || "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?auto=format&fit=crop&q=80&w=150";
-          const aLabel = content.assignmentsLabel || "Assignments";
-          const aVal = content.assignmentsValue || "3 Pending";
-
-          const tIconUrl = content.testsIconUrl || "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=150";
-          const tLabel = content.testsLabel || "Mock Tests";
-          const tVal = content.testsValue || "4 Pending";
-
-          const progItems = content.progressItems || [
-            { name: "Java Programming", progress: 75 },
-            { name: "Web Development", progress: 50 },
-            { name: "Aptitude Training", progress: 100 }
-          ];
-
-          const liveTitle = content.liveClassTitle || "Aptitude - Percentage";
-          const liveInst = content.liveClassInstructor || "By Ravi Sir";
-          const liveSch = content.liveClassSchedule || "Tomorrow, 11:00 AM";
-          const liveBtn = content.liveClassBtnText || "Join Class";
-
-          const vidThumbnail = content.videoThumbnailUrl || "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=600";
-          const vidUrl = content.videoUrl || "https://www.youtube.com";
-
-          const gLogoUrl = content.googleLogoUrl || "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg";
-          const gRating = content.googleRating || "4.8";
-          const gReviews = content.googleReviewsText || "Based on 500+ Reviews";
-          const gBtn = content.googleBtnText || "Read Reviews";
-          const gLink = content.googleReviewsLink || "https://google.com";
-
-          const recentActs = content.recentActivities || [
-            { id: "act-1", title: "Java Basics", type: "Live Class", status: "Completed", date: "10 May 2024", image: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-2", title: "Data Structures", type: "Assignment", status: "Submitted", date: "09 May 2024", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-3", title: "Aptitude Mock Test 1", type: "Mock Test", status: "In Progress", date: "09 May 2024", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-4", title: "Resume Building", type: "Live Class", status: "Completed", date: "08 May 2024", image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200" },
-            { id: "act-5", title: "Interview Skills", type: "Live Class", status: "Upcoming", date: "11 May 2024", image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=200" }
-          ];
-
-          const facultyCards = [
+          const partnerLeft = content.partnerLeft || 'UGSkill';
+          const partnerRight = content.partnerRight || 'TantraPex';
+          const ugLogo = content.ugLogo || 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1790320751/1779608301561_hwpzap.jpg';
+          const tantraLogo = content.tantraLogo || 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1783025553/Untitled_design_3_hez3tf.png';
+          const heroImage = content.heroImage || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200';
+          const closingImage = content.closingImage || heroImage;
+          const features = content.features || ['Structured Learning', 'Practice & Assessments', 'Skill Development', 'Placement Preparation'];
+          const journeySteps = content.journeySteps || ['Learn', 'Practice', 'Improve', 'Prepare', 'Perform'];
+          const facultyCards = content.facultyCards || [
             {
               itemNo: '01',
               domain: 'Training',
@@ -2581,8 +2540,7 @@ export default function DynamicSection({
               designation: 'Training Faculty',
               description:
                 "Faculty-led training sessions designed to strengthen students' practical knowledge, professional skills and understanding of real-world requirements.",
-              image:
-                'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200',
+              image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200',
               reverse: false,
             },
             {
@@ -2592,8 +2550,7 @@ export default function DynamicSection({
               designation: 'Coding Faculty',
               description:
                 'Technical sessions focused on programming fundamentals, problem-solving, coding practice and the skills required for technical placement opportunities.',
-              image:
-                'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1200',
+              image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1200',
               reverse: true,
             },
             {
@@ -2603,8 +2560,7 @@ export default function DynamicSection({
               designation: 'Aptitude Faculty',
               description:
                 'Structured aptitude preparation covering logical reasoning, quantitative ability and problem-solving skills commonly required in placement assessments.',
-              image:
-                'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1200',
+              image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1200',
               reverse: false,
             },
           ];
@@ -2621,32 +2577,32 @@ export default function DynamicSection({
                   <div className="grid items-center gap-8 lg:grid-cols-[1.15fr_0.85fr]">
                     <div className="space-y-5">
                       <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-[#071B4D]">
-                        COLLABORATION
+                        {content.collaborationBadge || 'COLLABORATION'}
                       </span>
 
                       <div className="space-y-3">
                         <h1 className="font-display text-[2.3rem] font-black leading-[1.05] tracking-[-0.05em] text-[#071B4D] sm:text-[2.9rem] lg:text-[4.1rem]">
-                          UGSkill <span className="text-[#0b204c]">×</span> TantraPex
+                          {partnerLeft} <span className="text-[#0b204c]">×</span> {partnerRight}
                         </h1>
                         <h2 className="max-w-xl text-xl font-semibold text-slate-700 md:text-[2rem] md:leading-[1.15]">
-                          Learning, Training & Placement Preparation — Together
+                          {content.heroSubtitle || 'Learning, Training & Placement Preparation — Together'}
                         </h2>
                       </div>
 
                       <p className="max-w-[650px] text-base leading-7 text-slate-600 md:text-lg">
-                        TantraPex has collaborated with UGSkill, a NexisparkX product, to provide students with continuous faculty-led learning, technical training and placement preparation.
+                        {content.heroDescription || 'TantraPex has collaborated with UGSkill, a NexisparkX product, to provide students with continuous faculty-led learning, technical training and placement preparation.'}
                       </p>
 
                       <div className="flex flex-wrap items-center gap-3 pt-2">
                         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                           <img
-                            src="https://res.cloudinary.com/dhy9pmo8s/image/upload/v1790320751/1779608301561_hwpzap.jpg"
+                            src={ugLogo}
                             alt="UG Skill logo"
                             className="h-12 w-12 rounded-xl object-cover border border-slate-200 bg-white"
                           />
                           <div>
-                            <div className="text-base font-black tracking-[-0.03em] text-[#071B4D]">UG Skill</div>
-                            <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-slate-500">A NexisparkX Product</div>
+                            <div className="text-base font-black tracking-[-0.03em] text-[#071B4D]">{content.ugName || 'UG Skill'}</div>
+                            <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-slate-500">{content.ugCaption || 'A NexisparkX Product'}</div>
                           </div>
                         </div>
 
@@ -2656,13 +2612,13 @@ export default function DynamicSection({
 
                         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                           <img
-                            src="https://res.cloudinary.com/dhy9pmo8s/image/upload/v1783025553/Untitled_design_3_hez3tf.png"
+                            src={tantraLogo}
                             alt="TantraPex logo"
                             className="h-12 w-12 rounded-xl object-cover border border-slate-200 bg-white"
                           />
                           <div>
-                            <div className="text-base font-black tracking-[-0.03em] text-[#071B4D]">TantraPex</div>
-                            <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-slate-500">Faculty-led learning</div>
+                            <div className="text-base font-black tracking-[-0.03em] text-[#071B4D]">{content.tantraName || 'TantraPex'}</div>
+                            <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-slate-500">{content.tantraCaption || 'Faculty-led learning'}</div>
                           </div>
                         </div>
                       </div>
@@ -2671,7 +2627,7 @@ export default function DynamicSection({
                     <div className="relative">
                       <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white p-2 shadow-[0_16px_42px_rgba(7,27,77,0.12)]">
                         <img
-                          src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200"
+                          src={heroImage}
                           alt="Indian college students learning together with a faculty member"
                           className="h-[320px] w-full rounded-[18px] object-cover md:h-[360px] lg:h-[430px]"
                         />
@@ -2684,14 +2640,14 @@ export default function DynamicSection({
                   <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                     <div className="flex items-center gap-4">
                       <img
-                        src="https://res.cloudinary.com/dhy9pmo8s/image/upload/v1790320751/1779608301561_hwpzap.jpg"
+                        src={ugLogo}
                         alt="UG Skill logo"
                         className="h-20 w-20 rounded-[20px] object-cover border border-slate-200 bg-white shadow-md"
                       />
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#071B4D]/70">Powered by</p>
-                        <h3 className="mt-1 text-3xl font-display font-black tracking-tight text-[#071B4D]">UG Skill</h3>
-                        <p className="text-base text-slate-600">A NexisparkX Product</p>
+                        <h3 className="mt-1 text-3xl font-display font-black tracking-tight text-[#071B4D]">{content.ugName || 'UG Skill'}</h3>
+                        <p className="text-base text-slate-600">{content.ugCaption || 'A NexisparkX Product'}</p>
                       </div>
                     </div>
 
@@ -2701,34 +2657,34 @@ export default function DynamicSection({
                         { label: 'Practice & Assessments', icon: Icons.CheckCircle2 },
                         { label: 'Skill Development', icon: Icons.BarChart3 },
                         { label: 'Placement Preparation', icon: Icons.BriefcaseBusiness },
-                      ].map(({ label, icon: Icon }) => (
+                      ].map(({ label, icon: Icon }, index) => (
                         <div key={label} className="flex min-h-[110px] flex-col items-center justify-center rounded-[18px] border border-slate-200 bg-white px-3 py-4 text-center shadow-sm">
                           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#edf3ff] text-[#071B4D]">
                             <Icon className="h-5 w-5" />
                           </div>
-                          <p className="text-[12px] font-bold leading-5 text-[#071B4D]">{label}</p>
+                          <p className="text-[12px] font-bold leading-5 text-[#071B4D]">{features[index] || label}</p>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   <div className="mt-5 max-w-3xl text-base leading-7 text-slate-600 md:text-lg">
-                    UGSkill is a NexisparkX product built to help students strengthen their skills through structured learning, assessments, practice and placement-focused preparation.
+                    {content.poweredDescription || 'UGSkill is a NexisparkX product built to help students strengthen their skills through structured learning, assessments, practice and placement-focused preparation.'}
                   </div>
                 </section>
 
                 <section className="mt-12 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#071B4D]/70">OUR COLLABORATION</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#071B4D]/70">{content.collaborationEyebrow || 'OUR COLLABORATION'}</p>
                   <h3 className="mt-3 text-[2.2rem] font-display font-black tracking-tight text-[#071B4D] sm:text-[2.8rem]">
-                    TantraPex × UGSkill Collaboration
+                    {content.collaborationTitle || 'TantraPex × UGSkill Collaboration'}
                   </h3>
                   <p className="mx-auto mt-4 max-w-4xl text-base leading-7 text-slate-600 md:text-lg">
-                    Through this collaboration, UGSkill provides continuous faculty support to TantraPex, offering structured training, technical learning and placement preparation for students.
+                    {content.collaborationDescription || 'Through this collaboration, UGSkill provides continuous faculty support to TantraPex, offering structured training, technical learning and placement preparation for students.'}
                   </p>
                 </section>
 
                 <section className="mt-12 space-y-8">
-                  {facultyCards.map((item) => (
+                  {facultyCards.map((item: any, index: number) => (
                     <div
                       key={item.domain}
                       className={`grid items-center gap-6 lg:grid-cols-2 ${
@@ -2736,7 +2692,7 @@ export default function DynamicSection({
                       }`}
                     >
                       <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_14px_32px_rgba(15,23,42,0.04)] md:p-8">
-                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#071B4D]/70">{item.itemNo}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#071B4D]/70">{item.itemNo || String(index + 1).padStart(2, '0')}</p>
                         <h4 className="mt-3 text-[2.1rem] font-display font-black tracking-tight text-[#071B4D] md:text-[2.5rem]">
                           {item.domain}
                         </h4>
@@ -2766,10 +2722,10 @@ export default function DynamicSection({
                 <section className="mt-14 rounded-[18px] border border-slate-200 bg-white p-5 shadow-[0_10px_26px_rgba(15,23,42,0.03)] md:p-6">
                   <div className="mb-6 text-center">
                     <h3 className="text-[2.15rem] font-display font-black tracking-tight text-[#071B4D]">
-                      From Learning to Placement
+                      {content.journeyTitle || 'From Learning to Placement'}
                     </h3>
                     <p className="mt-2 text-base text-slate-600">
-                      A continuous journey toward becoming placement-ready.
+                      {content.journeySubtitle || 'A continuous journey toward becoming placement-ready.'}
                     </p>
                   </div>
 
@@ -2786,7 +2742,7 @@ export default function DynamicSection({
                           <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#071B4D] text-white">
                             <Icon className="h-5 w-5" />
                           </div>
-                          <span className="text-sm font-bold uppercase tracking-[0.12em] text-[#071B4D]">{label}</span>
+                          <span className="text-sm font-bold uppercase tracking-[0.12em] text-[#071B4D]">{journeySteps[index] || label}</span>
                         </div>
                         {index < 4 && (
                           <div className="hidden h-10 w-10 items-center justify-center text-[#071B4D] md:flex">
@@ -2803,15 +2759,15 @@ export default function DynamicSection({
                   <div className="relative grid items-end gap-6 lg:grid-cols-[0.9fr_1.1fr]">
                     <div>
                       <h3 className="max-w-md text-[2.1rem] font-display font-black leading-[1.08] tracking-tight md:text-[3rem]">
-                        Building Placement-Ready Students Together
+                        {content.closingTitle || 'Building Placement-Ready Students Together'}
                       </h3>
                       <p className="mt-4 max-w-xl text-base leading-7 text-slate-200 md:text-lg">
-                        Through the collaboration between TantraPex and UGSkill, students receive continuous guidance, technical training and aptitude preparation to help them move confidently toward placement opportunities.
+                        {content.closingDescription || 'Through the collaboration between TantraPex and UGSkill, students receive continuous guidance, technical training and aptitude preparation to help them move confidently toward placement opportunities.'}
                       </p>
                     </div>
                     <div className="overflow-hidden rounded-[20px] border border-white/10 bg-white/5 p-2">
                       <img
-                        src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200"
+                        src={closingImage}
                         alt="Students walking toward their academic environment"
                         className="h-[220px] w-full rounded-[16px] object-cover md:h-[260px]"
                       />
@@ -3981,7 +3937,7 @@ export default function DynamicSection({
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                      {galleryImagesPool.map((image, index) => (
+                      {galleryImagesPool.map((image: string, index: number) => (
                         <div key={`${image}-${index}`} className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
                           <img
                             src={image}
@@ -4240,7 +4196,7 @@ export default function DynamicSection({
                         {glimpseDisplayImages.length > 0 && (
                           <div className="mt-8">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              {glimpseDisplayImages.map((image, index) => (
+                              {glimpseDisplayImages.map((image: string, index: number) => (
                                 <div key={`${image}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                                   <img src={image} alt="Workshop gallery glimpse" className="h-36 w-full object-cover" />
                                 </div>

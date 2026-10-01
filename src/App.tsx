@@ -941,9 +941,11 @@ export default function App() {
           />
         );
       case 'lms':
-        return (
-          <DynamicSection
-            section={{
+        {
+          const lmsSection = activePage.sections.find(section => section.type === 'lms-dashboard');
+          return (
+            <DynamicSection
+              section={lmsSection || {
               id: 'lms-fallback',
               type: 'lms-dashboard',
               title: 'UGSkill × TantraPex',
@@ -962,17 +964,18 @@ export default function App() {
                 cardBackgroundColor: '#ffffff',
                 borderColor: '#e2e8f0'
               }
-            }}
-            viewMode="live"
-            onEditField={handleEditField}
-            allPlacedStudents={placedStudents}
-            allHiringPartners={hiringPartners}
-            allCourses={courses}
-            allBlogs={blogs}
-            onAddLead={handleAddLead}
-            settings={settings}
-          />
-        );
+              }}
+              viewMode="live"
+              onEditField={handleEditField}
+              allPlacedStudents={placedStudents}
+              allHiringPartners={hiringPartners}
+              allCourses={courses}
+              allBlogs={blogs}
+              onAddLead={handleAddLead}
+              settings={settings}
+            />
+          );
+        }
       case 'services':
         return (
           <PublicServicesPage

@@ -69,12 +69,14 @@ export function UniversalImageUploader({ label, value, onChange, helperText, cla
 
         <div className="flex-1 text-center sm:text-left w-full">
           <div className="flex flex-col sm:flex-row items-center gap-2">
-            <label 
-              htmlFor={fileInputId} 
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] rounded cursor-pointer uppercase tracking-wider transition-all shadow active:scale-95 text-center block"
+            <button
+              type="button"
+              onClick={() => document.getElementById(fileInputId)?.click()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] rounded cursor-pointer uppercase tracking-wider transition-all shadow active:scale-95 text-center"
             >
+              <UploadCloud className="h-3.5 w-3.5" />
               Upload Image File
-            </label>
+            </button>
             <input 
               type="file" 
               accept="image/*"
@@ -159,12 +161,14 @@ export function UniversalImageUploaderLight({ label, value, onChange, helperText
 
         <div className="flex-1 text-center sm:text-left w-full">
           <div className="flex flex-col sm:flex-row items-center gap-2">
-            <label 
-              htmlFor={fileInputId} 
-              className="px-3 py-1.5 bg-[#071B4D] hover:bg-slate-900 text-white font-bold text-[10px] rounded cursor-pointer uppercase tracking-wider transition-all shadow active:scale-95 text-center block"
+            <button
+              type="button"
+              onClick={() => document.getElementById(fileInputId)?.click()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#071B4D] hover:bg-slate-900 text-white font-bold text-[10px] rounded cursor-pointer uppercase tracking-wider transition-all shadow active:scale-95 text-center"
             >
+              <UploadCloud className="h-3.5 w-3.5" />
               Upload Image
-            </label>
+            </button>
             <input 
               type="file" 
               accept="image/*"

@@ -76,7 +76,7 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
 }
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Lazy MongoDB Client Initialization
 const uri = process.env.MONGODB_URI;
