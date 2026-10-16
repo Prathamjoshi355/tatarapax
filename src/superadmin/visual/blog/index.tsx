@@ -2,7 +2,7 @@ import React from 'react';
 import { CMSPage, GlobalSettings, PlacedStudent, HiringPartner, Course, BlogPost } from '../../../types';
 import Header from '../../../components/common/Header';
 import Footer from '../../../components/common/Footer';
-import DynamicSection from '../../../components/sections/DynamicSection';
+import PublicBlogPage from '../../../public/blog';
 import VisualEditorSidebar from '../../../components/dashboard/VisualEditorSidebar';
 
 interface VisualEditorBlogPageProps {
@@ -54,32 +54,16 @@ export default function VisualEditorBlogPage({
           />
 
           <main className="flex-1">
-            {page.sections.map((section) => (
-              <div 
-                key={section.id} 
-                onClick={() => setSelectedSectionId(section.id)}
-                className={`relative transition-all duration-200 cursor-pointer ${
-                  selectedSectionId === section.id
-                    ? 'ring-4 ring-blue-500 ring-offset-2 rounded-lg shadow-lg z-20'
-                    : 'hover:ring-2 hover:ring-slate-300'
-                }`}
-              >
-                <div className="absolute top-2 left-2 bg-blue-600 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow z-30 opacity-70 hover:opacity-100 pointer-events-none">
-                  Click to Design: {section.type}
-                </div>
-                <DynamicSection
-                  section={section}
-                  viewMode="visual"
-                  onEditField={onEditField}
-                  allPlacedStudents={placedStudents}
-                  allHiringPartners={hiringPartners}
-                  allCourses={courses}
-                  allBlogs={blogs}
-                  onAddLead={() => {}}
-                  settings={settings}
-                />
-              </div>
-            ))}
+            <PublicBlogPage
+              page={page}
+              settings={settings}
+              placedStudents={placedStudents}
+              hiringPartners={hiringPartners}
+              courses={courses}
+              blogs={blogs}
+              onEditField={onEditField}
+              isVisualMode={true}
+            />
           </main>
 
           <Footer
@@ -103,7 +87,6 @@ export default function VisualEditorBlogPage({
         onDeleteSection={onDeleteSection}
         onAddSection={onAddSection}
       />
-
     </div>
   );
 }

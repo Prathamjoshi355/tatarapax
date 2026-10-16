@@ -1,1 +1,16 @@
-{"projectId":"prj_Isbt8pvLXxc1zxcJ8o2CdZt6Eirn","orgId":"team_fkaw3GTc3DFhnmQCt2PYFNTw","projectName":"tentrapax"}
+{
+  "projectId": "prj_Isbt8pvLXxc1zxcJ8o2CdZt6Eirn",
+  "orgId": "team_fkaw3GTc3DFhnmQCt2PYFNTw",
+  "projectName": "tentrapax",
+  "settings": {
+    "createdAt": 1782651079250,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

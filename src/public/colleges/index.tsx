@@ -1,606 +1,650 @@
 import React, { useState } from 'react';
-import { 
-  CMSPage, GlobalSettings, PlacedStudent, HiringPartner, Course, BlogPost, Lead 
-} from '../../types';
-import { 
-  GraduationCap, Presentation, FileBadge, Contact, Building2, Award, 
-  MapPin, Phone, Mail, Globe, Linkedin, Instagram, Youtube, Facebook, Check 
+import { CMSPage, GlobalSettings, PlacedStudent, HiringPartner, Course, BlogPost, Lead } from '../../types';
+import { DEFAULT_COLLEGES_SECTIONS } from '../../lib/defaultColleges';
+import {
+  School,
+  CheckCircle,
+  Terminal,
+  BarChart3,
+  Building2,
+  ArrowRight,
+  ChevronRight,
+  FileText,
+  Sliders,
+  FileCheck,
+  Rocket,
+  BadgePercent,
+  ShieldCheck,
+  Headphones,
+  Mail,
+  Phone,
+  Clock,
+  Gavel,
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 
 interface PublicCollegePartnershipPageProps {
   page: CMSPage;
-  settings: GlobalSettings;
-  placedStudents: PlacedStudent[];
-  hiringPartners: HiringPartner[];
-  courses: Course[];
-  blogs: BlogPost[];
-  onAddLead: (lead: Omit<Lead, 'id' | 'date'>) => void;
+  settings?: GlobalSettings;
+  placedStudents?: PlacedStudent[];
+  hiringPartners?: HiringPartner[];
+  courses?: Course[];
+  blogs?: BlogPost[];
+  onAddLead?: (lead: Omit<Lead, 'id' | 'date'>) => void;
   onEditField?: (sectionId: string, fieldPath: string, value: any) => void;
+  isVisualMode?: boolean;
 }
 
-const DEFAULT_COLLEGE_SECTIONS = [
-  {
-    id: "partnership-badge-hero",
-    type: "partnership-badge-hero",
-    title: "Partner With Us",
-    subtitle: "We work with colleges to provide better career opportunities",
-    content: {
-      badgeText: "9. COLLEGE PARTNERSHIP",
-      brochureBtnText: "Download Brochure",
-      brochureBtnLink: "#",
-      registerBtnText: "Register Your College",
-      registerBtnLink: "#contact",
-      benefits: [
-        { id: "b1", title: "Workshops & Seminars", image: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=120" },
-        { id: "b2", title: "CRT Training Programs", image: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&q=80&w=120" },
-        { id: "b3", title: "Placement Drives", image: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=120" },
-        { id: "b4", title: "Industrial Visits", image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=120" },
-        { id: "b5", title: "Faculty Development", image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=120" }
-      ]
-    }
-  },
-  {
-    id: "partnership-why",
-    type: "partnership-why",
-    title: "Why Partner With TANTRAPEX?",
-    subtitle: "",
-    content: {
-      cards: [
-        { id: "c1", title: "Industry Exposure", desc: "Give your students real world industry exposure.", image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=120" },
-        { id: "c2", title: "Better Placements", desc: "Improve placement rate with our training programs.", image: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=120" },
-        { id: "c3", title: "Skill Development", desc: "Enhance skills and employability of your students.", image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=120" },
-        { id: "c4", title: "Career Growth", desc: "Help students to build a successful career path.", image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=120" },
-        { id: "c5", title: "Long Term Association", desc: "Build a strong and long term partnership.", image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=120" },
-        { id: "c6", title: "Dedicated Support", desc: "Get dedicated support from our expert team.", image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=120" }
-      ]
-    }
-  },
-  {
-    id: "partnership-stats",
-    type: "partnership-stats",
-    title: "Key Metrics & Success",
-    subtitle: "",
-    content: {
-      stats: [
-        { id: "s1", count: "50+", label: "Partner Colleges", image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80&w=120" },
-        { id: "s2", count: "20K+", label: "Students Trained", image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=120" },
-        { id: "s3", count: "500+", label: "Placement Drives", image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&q=80&w=120" },
-        { id: "s4", count: "100+", label: "Workshops Conducted", image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=120" },
-        { id: "s5", count: "95%", label: "Placement Assistance", image: "https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&q=80&w=120" }
-      ]
-    }
-  },
-  {
-    id: "partnership-contact",
-    type: "partnership-contact",
-    title: "Get In Touch",
-    subtitle: "Interested in partnering with us? Let's build better futures together.",
-    content: {
-      officeTitle: "Bhopal Office",
-      officeAddress: "123, Arera Colony, Bhopal, Madhya Pradesh - 462016",
-      phone: "+91 90900 12345",
-      email: "info@tantrapex.com",
-      website: "www.tantrapex.com",
-      linkedinUrl: "https://linkedin.com",
-      instagramUrl: "https://instagram.com",
-      youtubeUrl: "https://youtube.com",
-      facebookUrl: "https://facebook.com"
-    }
-  },
-  {
-    id: "partnership-cta",
-    type: "partnership-cta",
-    title: "Ready to start your journey?",
-    subtitle: "Register now and get a free demo class.",
-    content: {
-      ctaBtnText: "Register Now",
-      ctaBtnLink: "#contact"
-    }
-  }
-];
+const iconMap: Record<string, React.ElementType> = {
+  School,
+  CheckCircle,
+  Terminal,
+  BarChart3,
+  Building2,
+  FileText,
+  Sliders,
+  FileCheck,
+  Rocket,
+  BadgePercent,
+  ShieldCheck,
+  Headphones
+};
 
 export default function PublicCollegePartnershipPage({
   page,
-  settings,
-  onAddLead
+  onAddLead,
+  isVisualMode = false
 }: PublicCollegePartnershipPageProps) {
-  // Ensure sections exist or load defaults
-  const sections = DEFAULT_COLLEGE_SECTIONS.map(defSec => {
-    const existing = page?.sections?.find(s => s.id === defSec.id || s.type === defSec.type);
-    if (existing) {
-      return {
-        ...defSec,
-        ...existing,
-        content: {
-          ...defSec.content,
-          ...existing.content
-        }
-      };
-    }
-    return defSec;
-  });
+  const sections = (page.sections && page.sections.length > 0 && page.sections.some(s => s.type.startsWith('college-')))
+    ? page.sections
+    : DEFAULT_COLLEGES_SECTIONS;
 
-  const heroSec = sections[0];
-  const whySec = sections[1];
-  const statsSec = sections[2];
-  const contactSec = sections[3];
-  const ctaSec = sections[4];
+  const heroSec = sections.find(s => s.type === 'college-hero') || DEFAULT_COLLEGES_SECTIONS[0];
+  const benefitsSec = sections.find(s => s.type === 'college-benefits') || DEFAULT_COLLEGES_SECTIONS[1];
+  const processSec = sections.find(s => s.type === 'college-process') || DEFAULT_COLLEGES_SECTIONS[2];
+  const enquirySec = sections.find(s => s.type === 'college-enquiry') || DEFAULT_COLLEGES_SECTIONS[3];
+  const statutorySec = sections.find(s => s.type === 'college-statutory') || DEFAULT_COLLEGES_SECTIONS[4];
 
-  // Lead Form State
+  const heroContent = heroSec.content || {};
+  const benefitsContent = benefitsSec.content || {};
+  const processContent = processSec.content || {};
+  const enquiryContent = enquirySec.content || {};
+  const statutoryContent = statutorySec.content || {};
+
+  const chipsList = heroContent.chips || [];
+  const pillarsList = benefitsContent.pillars || [];
+  const stepsList = processContent.steps || [];
+  const featuresList = enquiryContent.features || [];
+  const contactInfo = enquiryContent.contact || {};
+  const formConfig = enquiryContent.form || {};
+
+  // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    college: '',
+    collegeName: '',
+    contactName: '',
+    designation: '',
     email: '',
     phone: '',
-    purpose: 'College Placement Partnership',
+    city: '',
+    state: '',
+    studentCount: '',
+    interestAreas: [] as string[],
     message: ''
   });
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
 
-  const handleSubmitLead = async (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleInterestToggle = (area: string) => {
+    setFormData(prev => ({
+      ...prev,
+      interestAreas: prev.interestAreas.includes(area)
+        ? prev.interestAreas.filter(a => a !== area)
+        : [...prev.interestAreas, area]
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) return;
-    setSubmitting(true);
+    setIsSubmitting(true);
 
     try {
-      const fullMessage = `College: ${formData.college || 'Not Specified'}\nPurpose: ${formData.purpose}\n\nMessage: ${formData.message || 'No message'}`;
-      onAddLead({
-        type: 'partnership',
-        name: formData.name,
-        email: formData.email || 'no-email@tantrapex.com',
-        phone: formData.phone,
-        message: fullMessage,
-        status: 'new'
-      });
-      setSuccess(true);
-      setFormData({ name: '', college: '', email: '', phone: '', purpose: 'College Placement Partnership', message: '' });
+      if (onAddLead) {
+        onAddLead({
+          name: formData.contactName,
+          email: formData.email,
+          phone: formData.phone,
+          course: `College Partnership: ${formData.collegeName} (${formData.studentCount} students)`,
+          status: 'new',
+          notes: `Designation: ${formData.designation} | Location: ${formData.city}, ${formData.state} | Interests: ${formData.interestAreas.join(', ')} | Note: ${formData.message}`
+        });
+      }
+
+      // Also persist lead directly to API if available
+      try {
+        await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.contactName,
+            email: formData.email,
+            phone: formData.phone,
+            course: `College Partnership: ${formData.collegeName}`,
+            status: 'new',
+            notes: `Designation: ${formData.designation} | City: ${formData.city}, ${formData.state} | Batch: ${formData.studentCount} | Areas: ${formData.interestAreas.join(', ')} | Message: ${formData.message}`
+          })
+        });
+      } catch (e) {
+        // Fallback
+      }
+
+      setSubmitted(true);
     } catch (err) {
-      console.error(err);
+      console.error('Error submitting college inquiry:', err);
+      setSubmitted(true);
     } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Helper to render benefits icons
-  const getHeroIcon = (idx: number) => {
-    switch (idx) {
-      case 0: return <Presentation className="h-6 w-6 text-[#071B4D]" />;
-      case 1: return <FileBadge className="h-6 w-6 text-[#071B4D]" />;
-      case 2: return <Contact className="h-6 w-6 text-[#071B4D]" />;
-      case 3: return <Building2 className="h-6 w-6 text-[#071B4D]" />;
-      default: return <GraduationCap className="h-6 w-6 text-[#071B4D]" />;
-    }
-  };
-
-  // Helper to render why icons
-  const getWhyIcon = (idx: number) => {
-    switch (idx) {
-      case 0: return { icon: <GraduationCap className="h-6 w-6" />, bg: "bg-blue-50 text-blue-600 border border-blue-100" };
-      case 1: return { icon: <Award className="h-6 w-6" />, bg: "bg-purple-50 text-purple-600 border border-purple-100" };
-      case 2: return { icon: <FileBadge className="h-6 w-6" />, bg: "bg-orange-50 text-orange-600 border border-orange-100" };
-      case 3: return { icon: <Presentation className="h-6 w-6" />, bg: "bg-emerald-50 text-emerald-600 border border-emerald-100" };
-      case 4: return { icon: <Building2 className="h-6 w-6" />, bg: "bg-yellow-50 text-yellow-600 border border-yellow-100" };
-      default: return { icon: <Contact className="h-6 w-6" />, bg: "bg-pink-50 text-pink-600 border border-pink-100" };
-    }
-  };
-
-  // Helper for stats icons
-  const getStatIcon = (idx: number) => {
-    switch (idx) {
-      case 0: return <Building2 className="h-5 w-5 text-amber-400" />;
-      case 1: return <GraduationCap className="h-5 w-5 text-amber-400" />;
-      case 2: return <Contact className="h-5 w-5 text-amber-400" />;
-      case 3: return <Presentation className="h-5 w-5 text-amber-400" />;
-      default: return <Award className="h-5 w-5 text-amber-400" />;
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="w-full bg-white text-slate-800 font-sans leading-relaxed">
-      
-      {/* 1. HERO & BENEFITS ROW SECTION */}
-      <section className="py-16 md:py-24 bg-white border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 flex flex-col items-center text-center">
+    <div className="w-full bg-[#f7f9fd] text-[#191c1f] font-sans select-text">
+
+      {/* 1. TOP BREADCRUMB & EXECUTIVE HEADER SECTION */}
+      <section className="w-full bg-[#f2f4f8] py-12 lg:py-16 border-b border-[#e0e2e6]">
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
           
-          {/* Top Badge */}
-          {heroSec.content.badgeText && (
-            <div className="mb-6 inline-flex items-center justify-center bg-[#071B4D] text-white px-6 py-2 rounded-full shadow-md">
-              <span className="font-sans font-extrabold text-[11px] md:text-xs uppercase tracking-widest">
-                {heroSec.content.badgeText}
-              </span>
+          {/* Breadcrumb */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 mb-6 text-xs font-semibold text-[#5f5e5e]">
+            <a href="#/" className="hover:text-[#191c1f] transition-colors">
+              {heroContent.breadcrumbHome || 'Home'}
+            </a>
+            <ChevronRight className="h-3.5 w-3.5 text-[#707a67]" />
+            <span aria-current="page" className="text-[#191c1f] font-bold">
+              {heroContent.breadcrumbCurrent || 'College Partnerships'}
+            </span>
+          </nav>
+
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+            <div className="max-w-3xl flex flex-col gap-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#e0e2e6] rounded-md text-[#191c1f] w-fit">
+                <span className="w-2 h-2 rounded-full bg-[#80d64b]"></span>
+                <span className="text-[11px] font-bold uppercase tracking-widest font-mono">
+                  {heroContent.badgeText || 'FOR ENGINEERING COLLEGES & INSTITUTIONS'}
+                </span>
+              </div>
+
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-[#191c1f] tracking-tight font-extrabold font-display leading-[1.1]">
+                {heroSec.title || 'Partner with TantraPex'}
+              </h1>
+
+              <p className="text-base sm:text-lg text-[#5f5e5e] max-w-2xl leading-relaxed">
+                {heroSec.subtitle || 'Collaborate with TantraPex Technologies to bring corporate training, aptitude assessments, and verified placement drives to your campus.'}
+              </p>
             </div>
-          )}
 
-          {/* Main Headings */}
-          <h1 className="text-4xl md:text-5xl font-display font-extrabold text-[#071B4D] tracking-tight mb-4">
-            {heroSec.title}
-          </h1>
-          {heroSec.subtitle && (
-            <p className="text-slate-500 text-base md:text-lg max-w-2xl font-sans mb-12">
-              {heroSec.subtitle}
-            </p>
-          )}
-
-          {/* 5 Benefits Row */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-4 w-full max-w-5xl mb-12">
-            {heroSec.content.benefits?.map((item: any, idx: number) => {
-              const isUrl = item.image && (item.image.startsWith('http') || item.image.startsWith('data:'));
-              return (
-                <div key={item.id || idx} className="flex flex-col items-center p-5 rounded-2xl bg-white border border-slate-100 hover:border-slate-200 shadow-sm transition-all text-center">
-                  <div className="h-14 w-14 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4 overflow-hidden shadow-inner shrink-0">
-                    {isUrl ? (
-                      <img 
-                        src={item.image} 
-                        alt={item.title} 
-                        className="h-full w-full object-cover" 
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      getHeroIcon(idx)
-                    )}
+            {/* Quick Data Snapshot Chip Stack */}
+            <div className="flex flex-wrap lg:flex-col gap-3 lg:items-end shrink-0">
+              {chipsList.map((chip: any, idx: number) => {
+                const IconComponent = iconMap[chip.icon] || (idx === 0 ? School : CheckCircle);
+                return (
+                  <div
+                    key={chip.id || idx}
+                    className="bg-white px-5 py-3.5 rounded-xl shadow-xs border border-[#e0e2e6] flex items-center gap-3.5 min-w-[220px]"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-[#80d64b]/20 flex items-center justify-center text-[#2e6c00]">
+                      <IconComponent className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl font-extrabold text-[#191c1f] font-display leading-tight">
+                        {chip.value}
+                      </div>
+                      <div className="text-[11px] font-bold text-[#5f5e5e] uppercase tracking-wider font-mono mt-0.5">
+                        {chip.label}
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="font-display font-extrabold text-slate-800 text-xs md:text-sm tracking-tight leading-tight">
-                    {item.title}
-                  </h3>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Brochure & Register Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            {heroSec.content.registerBtnText && (
-              <a 
-                href={heroSec.content.registerBtnLink || "#contact"} 
-                className="px-8 py-3.5 bg-[#071B4D] hover:bg-slate-900 text-white font-extrabold text-xs md:text-sm uppercase tracking-widest rounded-lg shadow-lg hover:shadow-xl transition-all font-sans text-center min-w-[220px]"
-              >
-                {heroSec.content.registerBtnText}
-              </a>
-            )}
-            {heroSec.content.brochureBtnText && (
-              <button 
-                onClick={() => alert("Brochure download initiated... Thank you for partnering!")}
-                className="px-8 py-3.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 hover:text-slate-900 font-extrabold text-xs md:text-sm uppercase tracking-widest rounded-lg shadow-sm hover:shadow transition-all font-sans text-center min-w-[220px]"
-              >
-                {heroSec.content.brochureBtnText}
-              </button>
-            )}
+                );
+              })}
+            </div>
           </div>
 
         </div>
       </section>
 
-      {/* 2. WHY PARTNER WITH TANTRAPEX SECTION */}
-      <section className="py-16 md:py-24 bg-slate-50/50 border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+      {/* 2. PURPOSE & CORE INSTITUTIONAL BENEFITS (3 HIGH-IMPACT CARDS) */}
+      <section className="w-full bg-[#f7f9fd] py-16 lg:py-24 border-b border-[#e0e2e6]">
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
           
-          <div className="text-center max-w-3xl mx-auto mb-16 flex flex-col gap-2">
-            <h2 className="text-3xl md:text-4xl font-display font-extrabold text-[#071B4D] tracking-tight">
-              {whySec.title || "Why Partner With TANTRAPEX?"}
+          <div className="flex flex-col gap-2 mb-12">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#2e6c00] font-mono">
+              {benefitsContent.eyebrow || 'CORE INSTITUTIONAL VALUE'}
+            </span>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#191c1f] font-display">
+              {benefitsSec.title || 'Structured Campus Readiness Infrastructure'}
             </h2>
-            {whySec.subtitle && (
-              <p className="text-slate-500 text-sm font-sans">{whySec.subtitle}</p>
-            )}
           </div>
 
-          {/* Grid of 6 Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {whySec.content.cards?.map((item: any, idx: number) => {
-              const isUrl = item.image && (item.image.startsWith('http') || item.image.startsWith('data:'));
-              const fallbackIcon = getWhyIcon(idx);
+            {pillarsList.map((pillar: any, idx: number) => {
+              const IconComp = iconMap[pillar.icon] || Terminal;
+
               return (
-                <div 
-                  key={item.id || idx} 
-                  className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex items-start gap-4"
+                <div
+                  key={pillar.id || idx}
+                  className="bg-white p-7 rounded-2xl shadow-xs border border-[#e0e2e6] flex flex-col justify-between group hover:shadow-md hover:border-[#80d64b] transition-all"
                 >
-                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-inner ${fallbackIcon.bg}`}>
-                    {isUrl ? (
-                      <img 
-                        src={item.image} 
-                        alt={item.title} 
-                        className="h-full w-full object-cover" 
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      fallbackIcon.icon
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <h3 className="font-display font-extrabold text-slate-900 text-sm md:text-base leading-tight">
-                      {item.title}
+                  <div className="flex flex-col gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-[#e6e8ec] group-hover:bg-[#80d64b]/20 flex items-center justify-center text-[#191c1f] group-hover:text-[#2e6c00] transition-colors">
+                      <IconComp className="h-6 w-6" />
+                    </div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#707a67] font-mono">
+                      {pillar.pillarNumber || `Pillar 0${idx + 1}`}
+                    </div>
+                    <h3 className="text-xl font-bold text-[#191c1f] font-display group-hover:text-[#2e6c00] transition-colors">
+                      {pillar.title}
                     </h3>
-                    <p className="text-slate-500 text-xs md:text-sm font-sans leading-relaxed">
-                      {item.desc}
+                    <p className="text-xs sm:text-sm text-[#5f5e5e] leading-relaxed">
+                      {pillar.description}
                     </p>
                   </div>
-                </div>
-              );
-            })}
-          </div>
 
-        </div>
-      </section>
-
-      {/* 3. METRICS / STATS COUNTER ROW SECTION */}
-      <section className="bg-[#071B4D] text-white py-12 md:py-16">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-4 items-center justify-center text-center">
-            {statsSec.content.stats?.map((stat: any, idx: number) => {
-              const isUrl = stat.image && (stat.image.startsWith('http') || stat.image.startsWith('data:'));
-              return (
-                <div 
-                  key={stat.id || idx} 
-                  className={`flex flex-col items-center justify-center ${
-                    idx !== 0 ? 'md:border-l md:border-white/10 md:pl-4' : ''
-                  }`}
-                >
-                  {/* Small icon header */}
-                  <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center mb-3 overflow-hidden">
-                    {isUrl ? (
-                      <img 
-                        src={stat.image} 
-                        alt={stat.label} 
-                        className="h-full w-full object-cover" 
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      getStatIcon(idx)
-                    )}
+                  <div className="mt-8 pt-5 bg-[#f2f4f8] -mx-7 -mb-7 p-6 rounded-b-2xl flex items-center justify-between border-t border-[#e0e2e6]/70">
+                    <span className="text-xs font-bold text-[#191c1f]">
+                      {pillar.bottomTag}
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-[#2e6c00] group-hover:translate-x-1 transition-transform" />
                   </div>
-                  <span className="text-3xl md:text-4xl font-display font-extrabold text-amber-400 tracking-tight leading-none mb-1">
-                    {stat.count}
-                  </span>
-                  <span className="text-white/80 text-[11px] md:text-xs font-semibold uppercase tracking-wider font-sans">
-                    {stat.label}
-                  </span>
                 </div>
               );
             })}
           </div>
+
         </div>
       </section>
 
-      {/* 4. GET IN TOUCH / INQUIRY FORM SECTION */}
-      <section id="contact" className="py-16 md:py-24 bg-white border-b border-slate-100 scroll-mt-10">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
+      {/* 3. HOW THE COLLEGE COLLABORATION WORKS (4-STEP LINEAR WORKFLOW) */}
+      <section className="w-full bg-[#f2f4f8] py-16 lg:py-24 border-b border-[#e0e2e6]">
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
           
-          {/* Left Column: Contact info */}
-          <div className="md:col-span-5 flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-3xl md:text-4xl font-display font-extrabold text-[#071B4D] tracking-tight">
-                {contactSec.title}
-              </h2>
-              {contactSec.subtitle && (
-                <p className="text-slate-500 text-sm md:text-base font-sans">
-                  {contactSec.subtitle}
-                </p>
-              )}
-            </div>
-
-            {/* Address Info Cards */}
-            <div className="flex flex-col gap-4 mt-4">
-              
-              {/* Bhopal Office Address */}
-              <div className="flex items-start gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-                <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100/60">
-                  <MapPin className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-slate-800 text-sm leading-tight">
-                    {contactSec.content.officeTitle || "Bhopal Office"}
-                  </span>
-                  <p className="text-slate-500 text-xs md:text-sm mt-1 leading-relaxed">
-                    {contactSec.content.officeAddress || "123, Arera Colony, Bhopal, Madhya Pradesh - 462016"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Phone */}
-              <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-                <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100/60">
-                  <Phone className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Call Directly</span>
-                  <a href={`tel:${contactSec.content.phone}`} className="font-bold text-slate-800 text-sm md:text-base hover:text-blue-600 transition-colors">
-                    {contactSec.content.phone || "+91 90900 12345"}
-                  </a>
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-                <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100/60">
-                  <Mail className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Email Inquiry</span>
-                  <a href={`mailto:${contactSec.content.email}`} className="font-bold text-slate-800 text-sm md:text-base hover:text-blue-600 transition-colors">
-                    {contactSec.content.email || "info@tantrapex.com"}
-                  </a>
-                </div>
-              </div>
-
-              {/* Website */}
-              <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-                <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100/60">
-                  <Globe className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Official Portal</span>
-                  <a href={`https://${contactSec.content.website}`} target="_blank" rel="noreferrer" className="font-bold text-slate-800 text-sm md:text-base hover:text-blue-600 transition-colors">
-                    {contactSec.content.website || "www.tantrapex.com"}
-                  </a>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Social Media Row */}
-            <div className="flex items-center gap-3 mt-4">
-              {contactSec.content.linkedinUrl && (
-                <a href={contactSec.content.linkedinUrl} target="_blank" rel="noreferrer" className="h-10 w-10 rounded-full border border-slate-200 hover:border-[#0077b5] flex items-center justify-center text-slate-500 hover:text-white hover:bg-[#0077b5] transition-all shadow-sm">
-                  <Linkedin className="h-5 w-5" />
-                </a>
-              )}
-              {contactSec.content.instagramUrl && (
-                <a href={contactSec.content.instagramUrl} target="_blank" rel="noreferrer" className="h-10 w-10 rounded-full border border-slate-200 hover:border-[#e1306c] flex items-center justify-center text-slate-500 hover:text-white hover:bg-[#e1306c] transition-all shadow-sm">
-                  <Instagram className="h-5 w-5" />
-                </a>
-              )}
-              {contactSec.content.youtubeUrl && (
-                <a href={contactSec.content.youtubeUrl} target="_blank" rel="noreferrer" className="h-10 w-10 rounded-full border border-slate-200 hover:border-[#ff0000] flex items-center justify-center text-slate-500 hover:text-white hover:bg-[#ff0000] transition-all shadow-sm">
-                  <Youtube className="h-5 w-5" />
-                </a>
-              )}
-              {contactSec.content.facebookUrl && (
-                <a href={contactSec.content.facebookUrl} target="_blank" rel="noreferrer" className="h-10 w-10 rounded-full border border-slate-200 hover:border-[#1877f2] flex items-center justify-center text-slate-500 hover:text-white hover:bg-[#1877f2] transition-all shadow-sm">
-                  <Facebook className="h-5 w-5" />
-                </a>
-              )}
-            </div>
-
-          </div>
-
-          {/* Right Column: Inquiry Form Card */}
-          <div className="md:col-span-7 bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-md">
-            
-            {success ? (
-              <div className="text-center py-12 flex flex-col items-center justify-center gap-4">
-                <div className="h-16 w-16 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full flex items-center justify-center shadow-md animate-bounce">
-                  <Check className="h-8 w-8" />
-                </div>
-                <h3 className="text-2xl font-extrabold text-[#071B4D]">Inquiry Registered Successfully!</h3>
-                <p className="text-slate-500 text-sm max-w-sm mx-auto">
-                  Thank you for connecting with us. Our institutional relations representative will call you back within 24 working hours.
-                </p>
-                <button 
-                  onClick={() => setSuccess(false)}
-                  className="mt-6 px-6 py-2.5 bg-[#071B4D] hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-widest rounded transition-all"
-                >
-                  Send another request
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitLead} className="flex flex-col gap-5">
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-extrabold text-[#071B4D] uppercase tracking-wider">Your Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Enter your name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans placeholder:text-slate-400"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-extrabold text-[#071B4D] uppercase tracking-wider">Your College</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Enter college name"
-                      value={formData.college}
-                      onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                      className="px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans placeholder:text-slate-400"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-extrabold text-[#071B4D] uppercase tracking-wider">Your Email</label>
-                    <input 
-                      type="email" 
-                      placeholder="Enter your email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans placeholder:text-slate-400"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-extrabold text-[#071B4D] uppercase tracking-wider">Phone Number</label>
-                    <input 
-                      type="tel" 
-                      required
-                      placeholder="Enter phone number"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans placeholder:text-slate-400"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-[#071B4D] uppercase tracking-wider">Purpose</label>
-                  <select 
-                    value={formData.purpose}
-                    onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                    className="px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans cursor-pointer"
-                  >
-                    <option value="College Placement Partnership">College Placement Partnership</option>
-                    <option value="Workshops / Seminars">Workshops / Seminars</option>
-                    <option value="CRT Training">CRT Training</option>
-                    <option value="Other Inquiries">Other Inquiries</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-[#071B4D] uppercase tracking-wider">Your Message</label>
-                  <textarea 
-                    rows={4}
-                    placeholder="Write message..."
-                    value={formData.message}
-                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                    className="px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans resize-none placeholder:text-slate-400"
-                  />
-                </div>
-
-                <button 
-                  type="submit" 
-                  disabled={submitting}
-                  className="mt-2 w-full py-3 bg-[#071B4D] hover:bg-slate-900 text-white font-extrabold text-xs md:text-sm uppercase tracking-widest rounded-lg shadow-md hover:shadow-lg transition-all text-center"
-                >
-                  {submitting ? "Sending..." : "Send Message"}
-                </button>
-
-              </form>
-            )}
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* 5. READY TO START YOUR JOURNEY BANNER SECTION */}
-      <section className="py-12 md:py-16 bg-[#071B4D] text-white">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-12 text-center md:text-left">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl md:text-3xl font-display font-extrabold tracking-tight">
-              {ctaSec.title}
+          <div className="flex flex-col items-center text-center max-w-2xl mx-auto mb-16">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#2e6c00] font-mono">
+              {processContent.eyebrow || 'INSTITUTIONAL ROADMAP'}
+            </span>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#191c1f] font-display mt-2">
+              {processSec.title || 'How the College Collaboration Works'}
             </h2>
-            <p className="text-white/80 text-sm md:text-base font-sans">
-              {ctaSec.subtitle}
+            <p className="text-sm sm:text-base text-[#5f5e5e] mt-3 leading-relaxed">
+              {processSec.subtitle || 'A transparent, step-by-step engagement process designed to quickly integrate with your academic calendar.'}
             </p>
           </div>
-          <a 
-            href={ctaSec.content.ctaBtnLink || "#contact"} 
-            className="px-8 py-4 bg-amber-400 hover:bg-amber-300 text-[#071B4D] font-extrabold text-xs md:text-sm uppercase tracking-widest rounded-lg shadow-lg hover:shadow-xl transition-all font-sans text-center min-w-[200px]"
-          >
-            {ctaSec.content.ctaBtnText || "Register Now"}
-          </a>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {stepsList.map((step: any, idx: number) => {
+              const IconComponent = iconMap[step.icon] || FileText;
+              const isHighlight = step.isHighlighted;
+
+              return (
+                <div
+                  key={idx}
+                  className={`p-6 rounded-2xl flex flex-col justify-between border transition-all ${
+                    isHighlight
+                      ? 'bg-white border-[#80d64b] shadow-sm'
+                      : 'bg-white border-[#e0e2e6] hover:shadow-xs'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <span
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-display font-extrabold text-sm ${
+                          isHighlight
+                            ? 'bg-[#80d64b] text-[#092100]'
+                            : 'bg-[#191c1f] text-white'
+                        }`}
+                      >
+                        {step.stepNumber || idx + 1}
+                      </span>
+                      <IconComponent
+                        className={`h-5 w-5 ${
+                          isHighlight ? 'text-[#2e6c00]' : 'text-[#5f5e5e]'
+                        }`}
+                      />
+                    </div>
+
+                    <h3 className="text-base font-bold text-[#191c1f] font-display mb-2">
+                      {step.title}
+                    </h3>
+                    <p className="text-xs text-[#5f5e5e] leading-relaxed">
+                      {step.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-3.5 bg-[#f2f4f8] -mx-6 -mb-6 px-6 py-3 rounded-b-2xl border-t border-[#e0e2e6]/70">
+                    <span className="text-[10px] font-extrabold text-[#191c1f] uppercase tracking-wider font-mono">
+                      {step.bottomTag}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      </section>
+
+      {/* 4. COLLEGE / INSTITUTION ENQUIRY FORM (2-COLUMN SECTION) */}
+      <section className="w-full bg-[#f7f9fd] py-16 lg:py-24 border-b border-[#e0e2e6]" id="enquiry-section">
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
+          
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+            
+            {/* Left Side: Summary & Institutional Support Desk */}
+            <div className="lg:col-span-5 flex flex-col gap-6">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#2e6c00] font-mono">
+                  {enquiryContent.eyebrow || 'DIRECT PARTNERSHIP DESK'}
+                </span>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#191c1f] font-display mt-2 leading-tight">
+                  {enquirySec.title || 'Why 120+ Engineering Colleges Partner with TantraPex'}
+                </h2>
+                <p className="text-sm sm:text-base text-[#5f5e5e] mt-4 leading-relaxed">
+                  {enquirySec.subtitle || 'We bridge the gap between classroom theory and enterprise expectations with zero operational burden on your training cell.'}
+                </p>
+              </div>
+
+              {/* 3 Value Propositions */}
+              <div className="flex flex-col gap-3.5">
+                {featuresList.map((feat: any, idx: number) => {
+                  const FeatIcon = iconMap[feat.icon] || ShieldCheck;
+
+                  return (
+                    <div
+                      key={feat.id || idx}
+                      className="bg-white p-5 rounded-2xl border border-[#e0e2e6] flex items-start gap-4 shadow-xs"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-[#80d64b]/20 flex items-center justify-center text-[#2e6c00] shrink-0 mt-0.5">
+                        <FeatIcon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-[#191c1f] font-display">
+                          {feat.title}
+                        </h4>
+                        <p className="text-xs text-[#5f5e5e] leading-relaxed mt-1">
+                          {feat.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Institutional Support Desk Card */}
+              <div className="bg-white p-6 rounded-2xl border border-[#e0e2e6] shadow-xs flex flex-col gap-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#191c1f] font-mono">
+                  {contactInfo.deskTitle || 'Institutional Support Desk'}
+                </span>
+                <div className="flex flex-col gap-2.5 text-xs text-[#5f5e5e]">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-[#191c1f]" />
+                    <a
+                      href={`mailto:${contactInfo.email || 'partnerships@tantrapex.com'}`}
+                      className="text-[#191c1f] font-semibold hover:text-[#2e6c00] transition-colors"
+                    >
+                      {contactInfo.email || 'partnerships@tantrapex.com'}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-4 w-4 text-[#191c1f]" />
+                    <span className="text-[#191c1f] font-semibold">
+                      {contactInfo.phone || '+91 (080) 4128-9900'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-[#707a67]" />
+                    <span>{contactInfo.timing || 'Mon – Fri: 09:30 AM – 06:30 PM IST'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Interactive College Enquiry Form */}
+            <div className="lg:col-span-7 bg-white p-6 sm:p-10 rounded-3xl border border-[#e0e2e6] shadow-sm">
+              <div className="mb-6">
+                <h3 className="text-xl sm:text-2xl font-extrabold text-[#191c1f] font-display">
+                  {formConfig.title || 'College Partnership Enquiry'}
+                </h3>
+                <p className="text-xs sm:text-sm text-[#5f5e5e] mt-1.5 leading-relaxed">
+                  {formConfig.subtitle || 'Submit your college information below. Our institutional coordinator will respond within 24 business hours.'}
+                </p>
+              </div>
+
+              {submitted ? (
+                <div className="p-6 bg-[#f2f4f8] rounded-2xl border border-[#80d64b] flex items-start gap-4 animate-fade-in">
+                  <div className="w-10 h-10 rounded-xl bg-[#80d64b] flex items-center justify-center text-[#092100] shrink-0">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <h4 className="text-base font-bold text-[#191c1f] font-display">
+                      {formConfig.successTitle || 'Partnership Enquiry Received'}
+                    </h4>
+                    <p className="text-xs text-[#5f5e5e] leading-relaxed">
+                      {formConfig.successDesc || 'Thank you. Our institutional liaison desk will contact the designated TPO within 24 business hours.'}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSubmitted(false);
+                        setFormData({
+                          collegeName: '',
+                          contactName: '',
+                          designation: '',
+                          email: '',
+                          phone: '',
+                          city: '',
+                          state: '',
+                          studentCount: '',
+                          interestAreas: [],
+                          message: ''
+                        });
+                      }}
+                      className="mt-3 text-xs font-bold text-[#2e6c00] hover:underline self-start"
+                    >
+                      Submit Another Inquiry →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                  {/* College Name */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                      College / Institution Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. National Institute of Engineering & Technology"
+                      value={formData.collegeName}
+                      onChange={e => setFormData({ ...formData, collegeName: e.target.value })}
+                      className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                    />
+                  </div>
+
+                  {/* Contact Person & Designation */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                        Contact Person's Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Dr. S. K. Sharma"
+                        value={formData.contactName}
+                        onChange={e => setFormData({ ...formData, contactName: e.target.value })}
+                        className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                        Designation / Role *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Head of Training & Placements (TPO)"
+                        value={formData.designation}
+                        onChange={e => setFormData({ ...formData, designation: e.target.value })}
+                        className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Official Email & Phone */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                        Official Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="tpo@niet-edu.in"
+                        value={formData.email}
+                        onChange={e => setFormData({ ...formData, email: e.target.value })}
+                        className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                        Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="+91 98765 43210"
+                        value={formData.phone}
+                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                        className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* City & State */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Pune"
+                        value={formData.city}
+                        onChange={e => setFormData({ ...formData, city: e.target.value })}
+                        className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                        State *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Maharashtra"
+                        value={formData.state}
+                        onChange={e => setFormData({ ...formData, state: e.target.value })}
+                        className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Batch Size Dropdown */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                      Approximate Final Year Student Count *
+                    </label>
+                    <select
+                      required
+                      value={formData.studentCount}
+                      onChange={e => setFormData({ ...formData, studentCount: e.target.value })}
+                      className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all"
+                    >
+                      <option value="" disabled>Select Final Year Batch Size</option>
+                      <option value="100-300">100 - 300 Students</option>
+                      <option value="300-600">300 - 600 Students</option>
+                      <option value="600+">600+ Students</option>
+                    </select>
+                  </div>
+
+                  {/* Interested Areas */}
+                  <div className="flex flex-col gap-2.5">
+                    <span className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                      Interested Areas (Select all that apply)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { id: 'campus_training', label: 'Campus Training' },
+                        { id: 'pooled_drives', label: 'Pooled Placement Drives' },
+                        { id: 'mock_interviews', label: 'Mock Interviews' },
+                        { id: 'faculty_workshops', label: 'Faculty Workshops' }
+                      ].map(item => (
+                        <label
+                          key={item.id}
+                          className="flex items-center gap-3 p-3 bg-[#f2f4f8] hover:bg-[#eceef2] rounded-xl cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.interestAreas.includes(item.id)}
+                            onChange={() => handleInterestToggle(item.id)}
+                            className="w-4 h-4 rounded accent-[#2e6c00] cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-[#191c1f]">{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Message / Additional Details */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-[#191c1f] uppercase tracking-wide">
+                      Message / Additional Details
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Mention key departments (CSE, ECE, Mechanical), preferred drive months, or specific bootcamp requirements..."
+                      value={formData.message}
+                      onChange={e => setFormData({ ...formData, message: e.target.value })}
+                      className="bg-[#f2f4f8] px-4 py-3 rounded-xl text-xs sm:text-sm text-[#191c1f] border border-transparent focus:border-[#80d64b] focus:bg-white focus:outline-none transition-all resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-4 px-6 bg-[#80d64b] hover:bg-[#85dc50] text-[#092100] text-sm font-extrabold rounded-xl shadow-xs transition-colors text-center cursor-pointer disabled:opacity-50 mt-2 font-display"
+                  >
+                    {isSubmitting ? 'Submitting Enquiry...' : (formConfig.buttonText || 'Submit College Partnership Enquiry')}
+                  </button>
+                </form>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* 5. STATUTORY & ETHICAL COMPLIANCE NOTE */}
+      <section className="w-full bg-[#e6e8ec] py-6">
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 flex items-center gap-4">
+          <Gavel className="h-5 w-5 text-[#191c1f] shrink-0" />
+          <p className="text-xs sm:text-sm text-[#191c1f] font-medium leading-relaxed">
+            <span className="font-extrabold">{statutoryContent.statutoryLabel || 'Statutory Note:'}</span>{' '}
+            {statutoryContent.statutoryText || 'TantraPex Technologies works directly with approved college placement cells and TPOs. No commercial fees are charged to students for applying to drives.'}
+          </p>
         </div>
       </section>
 

@@ -128,16 +128,6 @@ export default function PasswordGateway({ settings, gatewayType, onSuccess, onCa
         </form>
 
         <div className="h-px bg-slate-700/60" />
-
-        <div className="flex flex-col gap-1.5 p-4 bg-slate-950/40 border border-slate-700/40 rounded-2xl text-center text-[11px] text-slate-400">
-          <span className="font-semibold text-amber-400 uppercase tracking-wider text-[9px]">Demo Mode Hint</span>
-          <span>
-            The default credential is: <code className="bg-slate-800 text-amber-200 px-1.5 py-0.5 rounded font-mono font-bold text-xs select-all">admin123</code>
-          </span>
-          <span className="text-[10px] text-slate-500">
-            You can modify this password inside the Global branding settings in the Admin Dashboard at any time.
-          </span>
-        </div>
       </div>
     </div>
   );

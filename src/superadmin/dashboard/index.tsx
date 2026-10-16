@@ -2,7 +2,7 @@ import React from 'react';
 import { CMSPage, GlobalSettings } from '../../types';
 import { 
   ShieldCheck, LayoutDashboard, Database, Lock, LogOut, FileCode, Edit3, Settings, ExternalLink, HelpCircle, 
-  BarChart3, Users, Award, BookOpen, Globe 
+  BarChart3, Users, Award, BookOpen, Globe, Menu, Sliders
 } from 'lucide-react';
 
 interface SuperAdminDashboardProps {
@@ -244,6 +244,33 @@ export default function SuperAdminDashboard({
 
         </div>
 
+        {/* Navbar & Footer Studio Banner */}
+        <div className="bg-gradient-to-r from-blue-950/30 via-slate-900 to-emerald-950/20 border border-blue-900/40 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4 text-left">
+            <div className="h-12 w-12 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+              <Menu className="h-6 w-6" />
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-extrabold text-white">Navbar & Footer Studio</h3>
+                <span className="bg-blue-500/10 text-blue-400 text-[9px] px-2 py-0.5 rounded-full border border-blue-500/20 font-bold uppercase tracking-widest">
+                  Live Visual Config
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                Full administrative control over Top Navbar links, order, badges, "Explore More" dropdown menus & icons, brand logo text/image, header CTA button, announcement banner, footer columns, legal links, and verified badges.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => onOpenAdmin('navigation')}
+            className="w-full md:w-auto py-2.5 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg hover:shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+          >
+            <Sliders className="h-4 w-4" />
+            <span>Customize Navbar &amp; Footer</span>
+          </button>
+        </div>
+
         {/* Global Collections CRM Banner */}
         <div className="bg-gradient-to-r from-emerald-950/20 to-slate-900 border border-emerald-900/40 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 text-left">
@@ -282,8 +309,8 @@ export default function SuperAdminDashboard({
         {/* Dynamic Pages Listing Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {pages.map((p) => {
-            // Check if page has special support for admin/visual routing (Home, About, Services, Blog, Contact, Colleges)
-            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact', 'college-partnership'].includes(p.id);
+            // Check if page has special support for admin/visual routing (Home, About, Services, Blog, Contact, Colleges, Pricing, LMS, Placed Students, Companies/Partners, Upcoming Drives)
+            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact', 'college-partnership', 'pricing', 'campus-ambassador', 'lms', 'placed-students', 'companies', 'upcoming-drives'].includes(p.id);
 
             return (
               <div 

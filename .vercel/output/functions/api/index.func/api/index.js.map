@@ -1,0 +1,1 @@
+{"version":3,"file":"index.ts","sources":["C:\\Users\\prath\\Downloads\\tentrapax\\api\\index.ts"],"names":[],"mappings":"AAAA,OAAO,GAAG,MAAM,eAAe,CAAC;AAEhC,eAAe,GAAG,CAAC","sourcesContent":["import app from \"./_lib/app.js\";\n\nexport default app;\n"]}
