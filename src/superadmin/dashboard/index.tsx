@@ -208,7 +208,7 @@ export default function SuperAdminDashboard({
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Dynamic Pages</span>
-              <span className="text-2xl font-black text-white">{pages.length} Pages</span>
+              <span className="text-2xl font-black text-white">{pages.length + 1} Pages</span>
             </div>
           </div>
 
@@ -310,7 +310,7 @@ export default function SuperAdminDashboard({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {pages.map((p) => {
             // Check if page has special support for admin/visual routing (Home, About, Services, Blog, Contact, Colleges, Pricing, LMS, Placed Students, Companies/Partners, Upcoming Drives)
-            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact', 'college-partnership', 'pricing', 'campus-ambassador', 'lms', 'placed-students', 'companies', 'upcoming-drives'].includes(p.id);
+            const isFullySupported = ['home', 'about', 'services', 'blog', 'contact', 'college-partnership', 'pricing', 'campus-ambassador', 'lms', 'placed-students', 'companies', 'upcoming-drives', 'policies'].includes(p.id);
 
             return (
               <div 
@@ -347,7 +347,7 @@ export default function SuperAdminDashboard({
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
                   <button 
                     onClick={() => onOpenAdmin(p.id)}
-                    className="w-full sm:w-1/2 py-2.5 px-4 bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 font-bold rounded-xl text-xs transition-colors shadow flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full sm:w-1/2 py-2.5 px-4 bg-slate-855 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 font-bold rounded-xl text-xs transition-colors shadow flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Settings className="h-4 w-4 text-slate-400" />
                     <span>Open Admin Config</span>
@@ -364,6 +364,48 @@ export default function SuperAdminDashboard({
               </div>
             );
           })}
+
+          {/* Legal Policies & Compliance Card (13th Document) */}
+          <div 
+            key="policies" 
+            className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col justify-between gap-6 transition-all group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
+
+            <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-lg text-white group-hover:text-blue-400 transition-colors">Legal Policies &amp; Compliance</h3>
+                  <span className="bg-emerald-500/10 text-emerald-400 text-[8px] px-1.5 py-0.5 rounded font-mono font-bold uppercase tracking-wider border border-emerald-500/20">
+                    Statutory Portal
+                  </span>
+                </div>
+                <span className="text-xs font-mono text-slate-400">Path Reference: /policy (Privacy, Terms, Refund, Disclaimer)</span>
+                <p className="text-xs text-slate-500 leading-relaxed mt-1">Configure institutional MoUs compliance clauses, privacy disclosures, grievance redressal, and non-refundable policy terms.</p>
+              </div>
+            </div>
+
+            <div className="h-px bg-slate-800" />
+
+            {/* Actions Panel */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+              <button 
+                onClick={() => onOpenAdmin('policies')}
+                className="w-full sm:w-1/2 py-2.5 px-4 bg-slate-855 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 font-bold rounded-xl text-xs transition-colors shadow flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Settings className="h-4 w-4 text-slate-400" />
+                <span>Open Admin Config</span>
+              </button>
+
+              <button 
+                onClick={() => onOpenVisual('policies')}
+                className="w-full sm:w-1/2 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all shadow-md hover:shadow-blue-500/10 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Edit3 className="h-4 w-4" />
+                <span>Open Visual Editor</span>
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>

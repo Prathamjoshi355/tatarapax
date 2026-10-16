@@ -61,6 +61,14 @@ import VisualEditorServicesPage from './superadmin/visual/services';
 import VisualEditorBlogPage from './superadmin/visual/blog';
 import VisualEditorContactPage from './superadmin/visual/contact';
 import VisualEditorLmsPage from './superadmin/visual/lms';
+import VisualEditorPricingPage from './superadmin/visual/pricing';
+import VisualEditorUpcomingDrivesPage from './superadmin/visual/upcoming-drives';
+import VisualEditorCampusAmbassadorPage from './superadmin/visual/campus-ambassador';
+import VisualEditorCollegesPage from './superadmin/visual/colleges';
+import VisualEditorPlacedStudentsPage from './superadmin/visual/placed-students';
+import VisualEditorPartnersPage from './superadmin/visual/partners';
+import VisualEditorPoliciesPage from './superadmin/visual/policies';
+import PoliciesAdminEditor from './components/dashboard/PoliciesAdminEditor';
 
 // Super Admin Dashboard
 import SuperAdminDashboard from './superadmin/dashboard';
@@ -673,6 +681,13 @@ export default function App() {
               }
             });
           }
+
+          // Guarantee all canonical pages exist in state
+          CANONICAL_PAGES_LIST.forEach((cp) => {
+            if (!uniqueMap.has(cp.id)) {
+              uniqueMap.set(cp.id, cp);
+            }
+          });
 
           setPages(sanitizePages(Array.from(uniqueMap.values())));
 
@@ -1474,6 +1489,14 @@ export default function App() {
             setMedia={setMedia}
           />
         );
+      case 'policies':
+      case 'policy':
+        return (
+          <PoliciesAdminEditor
+            settings={settings}
+            setSettings={setSettings}
+          />
+        );
       case 'navigation':
       case 'navbar-footer':
         return (
@@ -1803,12 +1826,21 @@ export default function App() {
         );
       case 'college-partnership':
         return (
-          <AdminCollegesPage
+          <VisualEditorCollegesPage
             page={pageToEdit}
-            setPages={setPages}
+            settings={settings}
+            placedStudents={placedStudents}
+            hiringPartners={hiringPartners}
+            courses={courses}
+            blogs={blogs}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
             onEditField={handleEditFieldOnPage}
+            onUpdateSectionDesign={handleUpdateSectionDesignOnPage}
             onMoveSection={handleMoveSectionOnPage}
+            onDuplicateSection={handleDuplicateSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
+            onAddSection={handleAddSectionOnPage}
           />
         );
       case 'lms':
@@ -1832,70 +1864,97 @@ export default function App() {
         );
       case 'placed-students':
         return (
-          <AdminPlacedStudentsPage
+          <VisualEditorPlacedStudentsPage
             page={pageToEdit}
-            setPages={setPages}
+            settings={settings}
             placedStudents={placedStudents}
-            setPlacedStudents={setPlacedStudents}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
             onEditField={handleEditFieldOnPage}
+            onUpdateSectionDesign={handleUpdateSectionDesignOnPage}
             onMoveSection={handleMoveSectionOnPage}
+            onDuplicateSection={handleDuplicateSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
-            media={media}
-            setMedia={setMedia}
+            onAddSection={handleAddSectionOnPage}
           />
         );
       case 'companies':
         return (
-          <AdminPartnersPage
+          <VisualEditorPartnersPage
             page={pageToEdit}
-            setPages={setPages}
+            settings={settings}
             hiringPartners={hiringPartners}
-            setHiringPartners={setHiringPartners}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
             onEditField={handleEditFieldOnPage}
+            onUpdateSectionDesign={handleUpdateSectionDesignOnPage}
             onMoveSection={handleMoveSectionOnPage}
+            onDuplicateSection={handleDuplicateSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
-            media={media}
-            setMedia={setMedia}
+            onAddSection={handleAddSectionOnPage}
           />
         );
       case 'pricing':
         return (
-          <AdminPricingPage
+          <VisualEditorPricingPage
             page={pageToEdit}
-            setPages={setPages}
+            settings={settings}
+            placedStudents={placedStudents}
+            hiringPartners={hiringPartners}
+            courses={courses}
+            blogs={blogs}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
             onEditField={handleEditFieldOnPage}
+            onUpdateSectionDesign={handleUpdateSectionDesignOnPage}
             onMoveSection={handleMoveSectionOnPage}
+            onDuplicateSection={handleDuplicateSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
-            media={media}
-            setMedia={setMedia}
+            onAddSection={handleAddSectionOnPage}
           />
         );
       case 'campus-ambassador':
         return (
-          <AdminCampusAmbassadorPage
+          <VisualEditorCampusAmbassadorPage
             page={pageToEdit}
-            setPages={setPages}
-            leads={leads}
-            setLeads={setLeads}
+            settings={settings}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
             onEditField={handleEditFieldOnPage}
+            onUpdateSectionDesign={handleUpdateSectionDesignOnPage}
             onMoveSection={handleMoveSectionOnPage}
+            onDuplicateSection={handleDuplicateSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
-            media={media}
-            setMedia={setMedia}
+            onAddSection={handleAddSectionOnPage}
           />
         );
       case 'upcoming-drives':
         return (
-          <AdminUpcomingDrivesPage
+          <VisualEditorUpcomingDrivesPage
             page={pageToEdit}
-            setPages={setPages}
+            settings={settings}
             drives={placementDrives}
-            setDrives={setPlacementDrives}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
             onEditField={handleEditFieldOnPage}
+            onUpdateSectionDesign={handleUpdateSectionDesignOnPage}
             onMoveSection={handleMoveSectionOnPage}
+            onDuplicateSection={handleDuplicateSectionOnPage}
             onDeleteSection={handleDeleteSectionOnPage}
-            media={media}
-            setMedia={setMedia}
+            onAddSection={handleAddSectionOnPage}
+          />
+        );
+      case 'policies':
+      case 'policy':
+        return (
+          <VisualEditorPoliciesPage
+            settings={settings}
+            setSettings={setSettings}
+            onOpenAdminConfig={() => {
+              setSubRoute('admin');
+              setAdminActivePageId('policies');
+              window.location.hash = '#/superadmin/admin/policies';
+            }}
           />
         );
       case 'navigation':

@@ -416,7 +416,7 @@ app.post("/api/save-all", async (req, res) => {
     const payload = req.body || {};
     const protectedCollections = ["placement_drives", "placement_applications", "plan_purchases", "workshop_registrations", "emails"];
     
-    const defaultPageIds = new Set(['about', 'contact', 'services', 'blog', 'college-partnership', 'placed-students', 'companies']);
+    const defaultPageIds = new Set(['about', 'contact', 'services', 'blog', 'college-partnership', 'placed-students', 'companies', 'campus-ambassador']);
     const mockStudentIds = new Set(['stud-stitch-1', 'stud-stitch-2', 'stud-stitch-3', 'stud-stitch-4']);
     const mockBlogIds = new Set(['blog-1', 'blog-2', 'blog-3', 'blog-4', 'blog-5', 'blog-6']);
 
