@@ -29,13 +29,15 @@ export default function Footer({
 
   const navigateToPage = (pageId: string) => {
     if (pageId.startsWith('#') && !pageId.startsWith('#/')) {
-      const el = document.querySelector(pageId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-        return;
-      }
+      try {
+        const el = document.querySelector(pageId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+      } catch {}
     }
-    const cleanId = pageId.replace(/^#(?:|\/)/, '').trim() || 'home';
+    const cleanId = (pageId || '').replace(/^[#/]+/, '').trim() || 'home';
     setCurrentPageId(cleanId);
     const nextHash = cleanId === 'home' ? '#/' : `#/${cleanId}`;
     if (window.location.hash !== nextHash) {

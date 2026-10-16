@@ -180,7 +180,8 @@ export default function PublicUpcomingDrivesPage({
   };
 
   const navigateTo = (path: string) => {
-    window.location.hash = path.startsWith('#') ? path : `#/${path.replace(/^\/+/, '')}`;
+    const clean = (path || '').replace(/^[#/]+/, '').trim();
+    window.location.hash = clean === '' || clean === 'home' ? '#/' : `#/${clean}`;
   };
 
   return (

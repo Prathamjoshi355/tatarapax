@@ -98,14 +98,17 @@ export default function PublicPricingPage({
   };
 
   const navigateTo = (target: string) => {
-    if (target.startsWith('#')) {
-      const el = document.querySelector(target);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-        return;
-      }
+    if (target.startsWith('#') && !target.startsWith('#/')) {
+      try {
+        const el = document.querySelector(target);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+      } catch {}
     }
-    const cleanTarget = target.startsWith('#/') ? target : `#/${target.replace(/^#/, '')}`;
+    const clean = (target || '').replace(/^[#/]+/, '').trim();
+    const cleanTarget = clean === '' || clean === 'home' ? '#/' : `#/${clean}`;
     window.location.hash = cleanTarget;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -427,7 +430,7 @@ export default function PublicPricingPage({
                       <span className={`text-xs block mt-1 font-semibold ${
                         isHighlighted ? 'text-[#2e6c00]' : 'text-[#5f5e5e]'
                       }`}>
-                        {plan.sublabel || "Inclusive of all taxes • 7-day refund guarantee"}
+                        {plan.sublabel || "Inclusive of all taxes • Non-refundable"}
                       </span>
                     </div>
 
@@ -805,7 +808,7 @@ export default function PublicPricingPage({
 
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-[#2e6c00] flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0" />
-                  <span>Institutional 7-day refund guarantee applies to all enrolled students.</span>
+                  <span>All enrollments are subject to our institutional non-refundable policy.</span>
                 </div>
 
                 <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#e0e2e6]">

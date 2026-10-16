@@ -84,7 +84,7 @@ export default function Header({
   };
 
   const navigateToPage = (pageId: string) => {
-    const cleanId = pageId.replace(/^#(?:|\/)/, '').trim() || 'home';
+    const cleanId = (pageId || '').replace(/^[#/]+/, '').trim() || 'home';
     setCurrentPageId(cleanId);
     const nextHash = cleanId === 'home' ? '#/' : `#/${cleanId}`;
     if (window.location.hash !== nextHash) {
@@ -103,16 +103,17 @@ export default function Header({
       setMobileMenuOpen(false);
       return;
     }
-    let target = rawLink.replace(/^#(?:|\/)/, '').trim();
+    let target = rawLink.replace(/^[#/]+/, '').trim();
     if (!target) target = 'home';
     navigateToPage(target);
   };
 
   // Helper to check if a link corresponds to the currently active page
   const isLinkActive = (rawLink: string) => {
-    let clean = rawLink.replace(/^#(?:|\/)/, '').trim();
+    let clean = (rawLink || '').replace(/^[#/]+/, '').trim();
     if (!clean) clean = 'home';
-    return currentPageId === clean;
+    const currentClean = (currentPageId || '').replace(/^[#/]+/, '').trim() || 'home';
+    return currentClean.toLowerCase() === clean.toLowerCase();
   };
 
   // Close dropdown on click outside
@@ -134,7 +135,7 @@ export default function Header({
 
   // Set of primary link targets to prevent duplicate items appearing in Explore More
   const primaryTargets = new Set(
-    primaryNavItems.map(p => p.link.replace(/^#(?:|\/)/, '').trim() || 'home')
+    primaryNavItems.map(p => (p.link || '').replace(/^[#/]+/, '').trim() || 'home')
   );
 
   // Filter explore more items:
@@ -144,7 +145,7 @@ export default function Header({
   const exploreMoreItems = (cfg.exploreMoreItems || DEFAULT_HEADER_CONFIG.exploreMoreItems)
     .filter((item) => {
       if (item.isVisible === false) return false;
-      const target = item.link.replace(/^#(?:|\/)/, '').trim() || 'home';
+      const target = (item.link || '').replace(/^[#/]+/, '').trim() || 'home';
       if (primaryTargets.has(target)) return false;
       if (target === 'courses' || target === 'career-courses') return false;
       return true;

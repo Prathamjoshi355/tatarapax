@@ -34,14 +34,17 @@ export default function PublicAboutPage({
   isVisualMode = false
 }: PublicAboutPageProps) {
   const navigateTo = (target: string) => {
-    if (target.startsWith('#')) {
-      const el = document.querySelector(target);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-        return;
-      }
+    if (target.startsWith('#') && !target.startsWith('#/')) {
+      try {
+        const el = document.querySelector(target);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+      } catch {}
     }
-    const cleanTarget = target.startsWith('#/') ? target : `#/${target.replace(/^#/, '')}`;
+    const clean = (target || '').replace(/^[#/]+/, '').trim();
+    const cleanTarget = clean === '' || clean === 'home' ? '#/' : `#/${clean}`;
     window.location.hash = cleanTarget;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

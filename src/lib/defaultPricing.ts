@@ -62,7 +62,7 @@ export const DEFAULT_PRICING_SECTIONS: CMSSection[] = [
           price: "₹3,000",
           numericAmount: 3000,
           period: "one-time fee",
-          sublabel: "Inclusive of all taxes • 7-day refund guarantee",
+          sublabel: "Inclusive of all taxes • Non-refundable",
           isPopular: true,
           features: [
             { text: "Full Aptitude & Technical Training (Live + Recorded)", included: true },
@@ -168,8 +168,8 @@ export const DEFAULT_PRICING_SECTIONS: CMSSection[] = [
           a: "The Career Pro Plan provides intensive aptitude and technical training, personalized 1-on-1 mock interviews, ATS resume overhaul, company-specific test series, and full unrestricted access to our digital learning resources (LMS) for 12 continuous months. It is designed for students who want structured daily coaching to boost their drive clearance rates."
         },
         {
-          q: "Can I get a refund if the training does not suit me?",
-          a: "Yes. Our institutional 7-day refund policy applies to all training programs. If within 7 calendar days of your cohort commencement you feel the curriculum does not match your career readiness needs, you can submit a straightforward cancellation request with no questions asked."
+          q: "Can I get a refund if I change my mind?",
+          a: "No. All training program fees and registrations are strictly non-refundable and non-transferable once enrolled, as per our institutional policy. Please review course deliverables carefully prior to completing payment."
         },
         {
           q: "Does paying for Career Pro guarantee me a job offer?",

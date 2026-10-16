@@ -105,7 +105,8 @@ export default function PublicPlacedStudentsPage({
   }, [studentList, searchQuery, selectedBatch, selectedBranch]);
 
   const navigateTo = (path: string) => {
-    window.location.hash = path.startsWith('#') ? path : `#/${path}`;
+    const clean = (path || '').replace(/^[#/]+/, '').trim();
+    window.location.hash = clean === '' || clean === 'home' ? '#/' : `#/${clean}`;
   };
 
   return (

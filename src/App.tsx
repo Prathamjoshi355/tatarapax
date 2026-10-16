@@ -169,6 +169,13 @@ const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
       }
     }
 
+    if (page.id === 'about') {
+      const hasModernSections = page.sections && page.sections.some(s => s.type && s.type.startsWith('about-hero'));
+      if (!hasModernSections) {
+        cleanedSections = DEFAULT_ABOUT_SECTIONS;
+      }
+    }
+
     if (page.id === 'campus-ambassador') {
       const hasModernSections = page.sections && page.sections.some(s => s.type === 'ambassador-header' || s.type === 'ambassador-responsibilities');
       if (!hasModernSections) {
@@ -309,18 +316,17 @@ const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
 
 const normalizeRoute = (hash: string): string => {
   const rawHash = (hash || '#/').trim().toLowerCase();
-  const withoutHash = rawHash.startsWith('#') ? rawHash.slice(1) : rawHash;
-  const withoutLeadingSlash = withoutHash.startsWith('/') ? withoutHash.slice(1) : withoutHash;
-  const withoutSearch = withoutLeadingSlash.split(/[?#]/)[0];
+  const withoutHash = rawHash.replace(/^[#/]+/, '');
+  const withoutSearch = withoutHash.split(/[?#]/)[0];
   return withoutSearch.replace(/\/+$/g, '');
 };
 
 const normalizePageSlug = (slug: string): string => {
-  return (slug || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+  return (slug || '').trim().toLowerCase().replace(/^[#/]+|\/+$/g, '');
 };
 
 const resolvePublicPageId = (route: string, pages: CMSPage[]): string => {
-  const normalized = route.trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+  const normalized = (route || '').trim().toLowerCase().replace(/^[#/]+|\/+$/g, '');
   if (normalized === '' || normalized === 'home') return 'home';
   if (normalized === 'about' || normalized === 'about-us') return 'about';
   if (normalized === 'contact' || normalized === 'contact-us') return 'contact';
@@ -343,7 +349,7 @@ const resolvePublicPageId = (route: string, pages: CMSPage[]): string => {
   const matchedPage = pages.find((p) => {
     const pageSlug = normalizePageSlug(p.slug);
     return (
-      p.id.toLowerCase() === normalized ||
+      (p.id || '').toLowerCase() === normalized ||
       pageSlug === normalized
     );
   });
@@ -525,9 +531,18 @@ export default function App() {
       const hash = window.location.hash || '#/';
       const lowerHash = hash.toLowerCase();
 
+      // Automatically normalize any double slashes in URL
+      if (hash.includes('//')) {
+        const sanitizedHash = '#' + hash.replace(/^#+/, '').replace(/\/+/g, '/');
+        if (window.location.hash !== sanitizedHash) {
+          window.location.hash = sanitizedHash;
+          return;
+        }
+      }
+
       if (lowerHash.startsWith('#/superadmin') || lowerHash.startsWith('#superadmin')) {
         setViewMode('superadmin');
-        const cleanPath = hash.replace(/^#(?:|\/)/, ''); // e.g. "superadmin/dashboard" or "superadmin/admin/home"
+        const cleanPath = hash.replace(/^[#/]+/, ''); // e.g. "superadmin/dashboard" or "superadmin/admin/home"
         const parts = cleanPath.split('/'); // e.g. ["superadmin", "dashboard"] or ["superadmin", "admin", "home"]
 
         const moduleName = parts[1]?.toLowerCase() || 'dashboard';
@@ -980,7 +995,8 @@ export default function App() {
   };
 
   const renderPublicPage = () => {
-    switch (currentPageId) {
+    const pageIdToRender = (currentPageId || 'home').replace(/^[#/]+/, '').trim().toLowerCase() || 'home';
+    switch (pageIdToRender) {
       case 'home':
         return (
           <PublicHomePage
@@ -1913,7 +1929,8 @@ export default function App() {
     }
   };
 
-  const activePage = pages.find(p => p.id === currentPageId) || CANONICAL_PAGES_MAP.get(currentPageId) || pages[0] || EMPTY_PAGE;
+  const normalizedCurrentPageId = (currentPageId || 'home').replace(/^[#/]+/, '').trim().toLowerCase() || 'home';
+  const activePage = pages.find(p => p.id === normalizedCurrentPageId) || CANONICAL_PAGES_MAP.get(normalizedCurrentPageId) || pages[0] || EMPTY_PAGE;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-text">
@@ -1924,8 +1941,11 @@ export default function App() {
           <Header
             settings={settings}
             pages={pages}
-            currentPageId={currentPageId}
-            setCurrentPageId={setCurrentPageId}
+            currentPageId={normalizedCurrentPageId}
+            setCurrentPageId={(id: string) => {
+              const clean = (id || 'home').replace(/^[#/]+/, '').trim().toLowerCase() || 'home';
+              setCurrentPageId(clean);
+            }}
           />
           <main className="flex-1">
             {renderPublicPage()}
@@ -1948,7 +1968,10 @@ export default function App() {
           <Footer
             settings={settings}
             pages={pages}
-            setCurrentPageId={setCurrentPageId}
+            setCurrentPageId={(id: string) => {
+              const clean = (id || 'home').replace(/^[#/]+/, '').trim().toLowerCase() || 'home';
+              setCurrentPageId(clean);
+            }}
             viewMode="live"
           />
         </>

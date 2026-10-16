@@ -152,7 +152,7 @@ export default function AdminPricingPage({
       price: 3999,
       numericAmount: 3999,
       period: "/ One-Time",
-      sublabel: "Inclusive of all taxes • 7-day refund guarantee",
+      sublabel: "Inclusive of all taxes • Non-refundable",
       features: [
         { text: "6 Months LMS & Sandbox Access", included: true },
         { text: "1-on-1 Technical Mock Interviews", included: true },
@@ -717,13 +717,13 @@ export default function AdminPricingPage({
                       </div>
 
                       <div className="flex flex-col gap-1">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Refund Guarantee / Sublabel</label>
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Plan Sublabel / Policy</label>
                         <textarea
                           rows={2}
                           value={plan.sublabel || ''}
                           onChange={(e) => handleUpdatePlan(pIdx, { sublabel: e.target.value })}
                           className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 leading-relaxed"
-                          placeholder="e.g. Inclusive of all taxes • 7-day refund guarantee"
+                          placeholder="e.g. Inclusive of all taxes • Non-refundable"
                         />
                       </div>
                     </div>
@@ -970,7 +970,7 @@ export default function AdminPricingPage({
             <div>
               <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">FAQ Configuration</span>
               <h2 className="text-lg font-bold text-white mt-1">Frequently Asked Questions</h2>
-              <p className="text-xs text-slate-400 mt-1">Answer candidate doubts regarding placement zero-cost access and 7-day refund policy.</p>
+              <p className="text-xs text-slate-400 mt-1">Answer candidate doubts regarding placement zero-cost access and non-refundable policy.</p>
             </div>
 
             <button
