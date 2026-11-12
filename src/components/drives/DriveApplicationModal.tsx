@@ -13,7 +13,8 @@ import {
   Award,
   Lock,
   RefreshCw,
-  Paperclip
+  Paperclip,
+  ExternalLink
 } from 'lucide-react';
 
 interface DriveApplicationModalProps {
@@ -410,6 +411,20 @@ export default function DriveApplicationModal({
       if (resJson.success) {
         setSubmittedRefId(resJson.applicationReferenceId);
         if (onApplicationSuccess) onApplicationSuccess(resJson.applicationReferenceId);
+
+        // Also capture application lead in background for CRM dashboard
+        fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formValues.fullName || 'Candidate',
+            email: formValues.email || '',
+            phone: formValues.phone || 'N/A',
+            source: `Placement Drive: ${drive.companyName || ''} - ${drive.title}`,
+            college: formValues.college || 'Enrolled Student',
+            notes: `Applied for drive ${drive.id} (${drive.title}) at ${drive.companyName}. Degree: ${formValues.degree || 'N/A'}, CGPA: ${formValues.cgpa || 'N/A'}`
+          })
+        }).catch(() => {});
       } else {
         setErrorMessage(resJson.msg || "Failed to submit application. Please check details and try again.");
       }
@@ -543,23 +558,42 @@ export default function DriveApplicationModal({
               </div>
             </div>
 
-            {/* WhatsApp Community Banner */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 w-full max-w-md text-center space-y-2">
-              <p className="text-xs font-bold text-emerald-900">
-                Join the Official TantraPex Placement Updates Community (Optional)
-              </p>
-              <p className="text-[11px] text-emerald-700">
-                Receive instant schedule announcements, screening notifications, and interview tips directly on WhatsApp.
-              </p>
-              <a
-                href="https://chat.whatsapp.com/tantrapex-placements"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#2e6c00] hover:bg-[#255700] text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
-              >
-                Join WhatsApp Community
-              </a>
-            </div>
+            {/* WhatsApp Community / Group Link (Custom drive group or official community) */}
+            {drive.whatsappGroupUrl ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 w-full max-w-md text-center space-y-2">
+                <p className="text-xs font-bold text-emerald-900">
+                  Join the Official {drive.companyName || 'Placement Drive'} Candidate Group
+                </p>
+                <p className="text-[11px] text-emerald-700">
+                  Receive instant test schedules, screening updates, and interview rounds directly on WhatsApp.
+                </p>
+                <a
+                  href={drive.whatsappGroupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 text-xs font-extrabold rounded-xl transition-all shadow-sm hover:scale-[1.02]"
+                >
+                  <span>💬 Join the Group</span>
+                </a>
+              </div>
+            ) : (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 w-full max-w-md text-center space-y-2">
+                <p className="text-xs font-bold text-emerald-900">
+                  Join the Official TantraPex Placement Updates Community (Optional)
+                </p>
+                <p className="text-[11px] text-emerald-700">
+                  Receive instant schedule announcements, screening notifications, and interview tips directly on WhatsApp.
+                </p>
+                <a
+                  href="https://chat.whatsapp.com/tantrapex-placements"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#2e6c00] hover:bg-[#255700] text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  Join the Group
+                </a>
+              </div>
+            )}
 
             <button
               onClick={onClose}
@@ -570,6 +604,35 @@ export default function DriveApplicationModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+
+            {/* Google Form / External Application Integration */}
+            {drive.googleFormUrl && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded inline-block">
+                      Official Application Link
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500">Google Form Connected</span>
+                  </div>
+                  <h4 className="text-xs font-extrabold text-slate-900">
+                    Apply directly via Corporate Google Form
+                  </h4>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    You can submit your application via the official Google Form, or complete our verified dynamic form below with zero fees.
+                  </p>
+                </div>
+                <a
+                  href={drive.googleFormUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold transition-all shadow flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                >
+                  <span>Open Google Form</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
 
             {/* Drive Quick Metadata Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs">

@@ -19,7 +19,7 @@ export const DEFAULT_CONTACT_SECTIONS: CMSSection[] = [
     content: {
       offices: [
         { id: "of-1", name: "Corporate HQ - Bengaluru", address: "Institutional Placement Tower, Outer Ring Road, Bengaluru, Karnataka - 560103" },
-        { id: "of-2", name: "Central Placement Desk", address: "123, Arera Colony, Bhopal, Madhya Pradesh - 462016" }
+        { id: "of-2", name: "Central Placement Desk", address: "3rd Floor, Prestige Vihar, Vijay Nagar, Scheme No 74C, Indore, Madhya Pradesh 452010" }
       ],
       supportEmail: "contact@tantrapex.com",
       supportPhone: "+91 (080) 4920-8000"
@@ -169,6 +169,63 @@ export const CANONICAL_PAGES_LIST: CMSPage[] = [
       keywords: 'placement partners, hiring partners, enterprise recruiters, tech companies hiring'
     },
     sections: DEFAULT_PARTNERS_SECTIONS
+  },
+  {
+    id: 'workshops',
+    title: 'Workshops & Placement Clinics',
+    slug: '/workshops',
+    seo: {
+      title: 'Workshops & Placement Clinics | TantraPex Technologies',
+      description: 'Hands-on technical workshops, resume clinics, and live mock interview panels led by industry veterans.',
+      keywords: 'workshops, resume clinic, mock interview, placement training, technical bootcamps'
+    },
+    sections: [
+      {
+        id: 'sec-workshops-hero',
+        type: 'hero',
+        title: 'Practical Upskilling & Engineering Masterclasses',
+        subtitle: 'Hands-on technical workshops, resume clinics, and live mock interview panels led by industry veterans.',
+        content: {},
+        design: {
+          backgroundColor: '#ffffff',
+          textColor: '#111111',
+          headingColor: '#111111',
+          borderRadius: '12px',
+          paddingY: '12',
+          animation: 'none'
+        }
+      },
+      {
+        id: 'sec-workshops-list',
+        type: 'workshops-list',
+        title: 'Upcoming Campus Workshops',
+        subtitle: 'Reserve your verified seat, receive official Admit Cards, and unlock lifetime session recordings.',
+        content: {
+          workshops: [],
+          galleryImages: [],
+          isWorkshopsCustomized: true
+        },
+        design: {
+          backgroundColor: '#ffffff',
+          textColor: '#111111',
+          headingColor: '#111111',
+          borderRadius: '12px',
+          paddingY: '12',
+          animation: 'none'
+        }
+      }
+    ]
+  },
+  {
+    id: 'register-for-free',
+    title: 'Register for Free Placement Drives',
+    slug: '/register-for-free',
+    seo: {
+      title: 'Free Candidate Placement Registration | TantraPex Technologies',
+      description: 'Register for 100% free corporate campus and pooled placement drives. Zero registration fees, zero salary deductions, and direct WhatsApp updates.',
+      keywords: 'free placement registration, campus recruitment, engineering jobs, fresher drives, 100% free placement'
+    },
+    sections: []
   }
 ];
 

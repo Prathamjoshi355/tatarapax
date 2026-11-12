@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CMSSection, PlacedStudent, HiringPartner, Course, BlogPost, Lead, GlobalSettings, Service } from '../../types';
+import { CMSSection, PlacedStudent, HiringPartner, Course, BlogPost, Lead, GlobalSettings, Service, WorkshopItem } from '../../types';
+import { isWorkshopPast, parseWorkshopDate, getAllWorkshopGlimpses, WorkshopGlimpseItem } from '../../lib/workshopUtils';
 import * as Icons from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import UpcomingDrivesSection from './UpcomingDrivesSection';
@@ -9,7 +10,7 @@ const getEmbedUrl = (rawUrl: string): string => {
   if (!rawUrl) {
     return "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3666.2163989182373!2d77.4277!3d23.2332!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x397c42636f2f2f11%3A0x7d8a6b1297eefb3b!2sArera%20Colony%2C%20Bhopal%2C%20Madhya%20Pradesh%20462016!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin";
   }
-  
+
   const url = rawUrl.trim();
 
   // 1. If it's an iframe HTML tag, extract the src attribute
@@ -43,7 +44,7 @@ const getEmbedUrl = (rawUrl: string): string => {
     }
   }
 
-  // 4. If it's a general non-http text (like "Bhopal Office, Tantrapex"), convert to search embed query
+  // 4. If it's a general non-http text (like "Indore HQ, Tantrapex"), convert to search embed query
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     return `https://maps.google.com/maps?q=${encodeURIComponent(url)}&output=embed`;
   }
@@ -155,15 +156,17 @@ export default function DynamicSection({
   const [activeBlogCategory, setActiveBlogCategory] = useState('All');
   const [activeReaderBlog, setActiveReaderBlog] = useState<BlogPost | null>(null);
   const [activeWorkshopTab, setActiveWorkshopTab] = useState<'upcoming' | 'past' | 'gallery'>('upcoming');
-  const [visibleWorkshopsCount, setVisibleWorkshopsCount] = useState(2);
+  const [visibleWorkshopsCount, setVisibleWorkshopsCount] = useState(6);
   const [registeredWkTitle, setRegisteredWkTitle] = useState<string | null>(null);
   const [selectedWorkshopDetail, setSelectedWorkshopDetail] = useState<any | null>(null);
-  
+
   // Public Workshop Enrollment Form States
   const [regWorkshop, setRegWorkshop] = useState<any | null>(null);
   const [regForm, setRegForm] = useState({ name: '', email: '', phone: '', college: '', branch: '', year: '3rd Year' });
   const [isPaying, setIsPaying] = useState(false);
   const [paymentSuccessData, setPaymentSuccessData] = useState<any | null>(null);
+  const [selectedGlimpseWorkshopFilter, setSelectedGlimpseWorkshopFilter] = useState<string>('all');
+  const [lightboxGlimpseIndex, setLightboxGlimpseIndex] = useState<number | null>(null);
 
   // LMS mini-dashboard navigation state
   const [activeLmsTab, setActiveLmsTab] = useState('dashboard');
@@ -210,7 +213,7 @@ export default function DynamicSection({
         console.error("Failed to load Razorpay Key ID:", err);
       });
   }, []);
-  
+
   const [assessmentModalOpen, setAssessmentModalOpen] = useState(false);
   const [assessmentStep, setAssessmentStep] = useState(0);
   const [assessmentAnswers, setAssessmentAnswers] = useState<any>({});
@@ -284,7 +287,7 @@ export default function DynamicSection({
         </div>
       )}
 
-      <div className={type === 'hero' || type === 'upcoming-drives' ? "w-full" : `mx-auto ${!settings.containerWidth || settings.containerWidth === 'max-w-7xl' ? 'max-w-[1400px]': settings.containerWidth}`}>
+      <div className={type === 'hero' || type === 'upcoming-drives' ? "w-full" : `mx-auto ${!settings.containerWidth || settings.containerWidth === 'max-w-7xl' ? 'max-w-[1400px]' : settings.containerWidth}`}>
 
         {/* Render Sections Based on Type */}
 
@@ -312,7 +315,7 @@ export default function DynamicSection({
 
             {/* Content Container aligned left */}
             <div className="relative z-20 w-full pt-500px">
-              <div className="px-6 pt-20 sm:px-12 md:px-16 lg:px-20" style={{paddingTop: "70px"}}>
+              <div className="px-6 pt-20 sm:px-12 md:px-16 lg:px-20" style={{ paddingTop: "70px" }}>
                 <div className="max-w-3xl flex flex-col gap-5 md:gap-7 text-left items-start">
 
                   {/* Large Heading */}
@@ -505,7 +508,7 @@ export default function DynamicSection({
                             renderIcon(wc.icon || "Award", "h-7 w-7 text-blue-600")
                           )}
                         </div>
-                        <span 
+                        <span
                           onClick={(e) => handleElementClick(e, `content.cards.${i}.title`, wc.title)}
                           className={`text-xs sm:text-sm font-display font-black text-[#071B4D] mt-3 leading-tight ${editableClass(`content.cards.${i}.title`)}`}
                         >
@@ -559,7 +562,7 @@ export default function DynamicSection({
 
         {/* 3b. SERVICES HOME SECTION */}
         {type === 'services-home' && (
-         <div className="flex flex-col gap-8 md:gap-12 py-8 md:py-20 mb-8">
+          <div className="flex flex-col gap-8 md:gap-12 py-8 md:py-20 mb-8">
             <div className="text-center max-w-3xl mx-auto mb-4 flex flex-col gap-3 md:gap-12 py-8 md:py-12 ">
               <h2 className=" pt-30 text-3xl md:text-5xl lg:text-4xl font-display font-black text-[#071B4D] " style={{ color: design.headingColor }}>
                 {title}
@@ -725,9 +728,9 @@ export default function DynamicSection({
         {/* 3f. WORKSHOPS HOME SECTION */}
         {type === 'workshops-home' && (
           <div className="flex flex-col gap-8">
-            
+
             <div className="text-center max-w-3xl mx-auto flex flex-col gap-3">
-             
+
               <h2 className="text-3xl md:text-5xl lg:text-4xl font-display font-black text-[#071B4D]" style={{ color: design.headingColor }}>
                 {title}
               </h2>
@@ -909,7 +912,7 @@ export default function DynamicSection({
             <div className="relative mt-8 flex flex-col items-center">
               {/* Horizontal connecting line for desktop (visible on lg screens) */}
               <div className="hidden lg:block absolute top-8 left-12 right-12 h-0.5 border-t-2 border-dashed border-blue-200 z-0" />
-              
+
               <div className="grid grid-cols-1 mobileL:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-8 w-full max-w-6xl relative z-10">
                 {(content.steps || []).map((st: any, i: number) => (
                   <div key={st.id || i} className="flex flex-col items-center text-center relative group">
@@ -1068,7 +1071,7 @@ export default function DynamicSection({
                     View All
                   </button>
                 </div>
-                
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {allPlacedStudents.filter(st => st.showOnHomepage !== false).slice(0, 6).map((st: any, idx: number) => (
                     <div
@@ -1086,7 +1089,7 @@ export default function DynamicSection({
                       <span className="font-extrabold text-xs text-[#071B4D] mt-3 truncate w-full">{st.name}</span>
                       <span className="text-[10px] text-slate-500 font-bold truncate w-full mt-0.5">{st.branch || "Software Engineer"}</span>
                       <span className="text-[10px] text-[#071B4D] font-extrabold px-2.5 py-0.5 bg-blue-50 rounded-full border border-blue-100 mt-1.5 truncate max-w-full">{st.company}</span>
-                      
+
                       <div className="mt-4 pt-3 border-t border-slate-100/80 w-full flex flex-col items-center">
                         <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Package</span>
                         <span className="text-xs font-black text-[#071B4D] mt-0.5">{st.packageLpa || "LPA"}</span>
@@ -1095,7 +1098,7 @@ export default function DynamicSection({
                   ))}
                 </div>
               </div>
-              
+
               <div className="flex justify-center mt-6 sm:hidden">
                 <button
                   onClick={() => { navigateToRoute('#/placed-students'); }}
@@ -1121,7 +1124,7 @@ export default function DynamicSection({
                     View All Companies
                   </button>
                 </div>
-                
+
                 {/* Infinite Auto-Sliding Marquee Containers (Clean Borderless Image Slider) */}
                 {(() => {
                   const partnersList = allHiringPartners.filter(p => p.isVisible !== false);
@@ -1195,7 +1198,7 @@ export default function DynamicSection({
                   );
                 })()}
               </div>
-              
+
               <div className="flex justify-center mt-6 sm:hidden">
                 <button
                   onClick={() => { navigateToRoute('#/companies'); }}
@@ -1242,8 +1245,8 @@ export default function DynamicSection({
 
               if (partnersLayout === 'carousel') {
                 // Return a beautiful full-screen width continuous infinite auto-scroller
-                const duplicatePartners = filteredPartners.length > 0 
-                  ? [...filteredPartners, ...filteredPartners, ...filteredPartners, ...filteredPartners] 
+                const duplicatePartners = filteredPartners.length > 0
+                  ? [...filteredPartners, ...filteredPartners, ...filteredPartners, ...filteredPartners]
                   : [];
                 return (
                   <div className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden py-8 sm:py-12 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 border-y border-slate-200/70 shadow-sm my-2">
@@ -1420,43 +1423,43 @@ export default function DynamicSection({
                   {title}
                 </h2>
 
-              <div
-  onClick={(e) =>
-    handleElementClick(e, "content.description", content.description)
-  }
-  className={`mt-6 text-sm md:text-base text-slate-600 font-sans ${editableClass(
-    "content.description"
-  )}`}
->
-  {content.description.split("\n").map((line: string, index: number) => {
-    const text = line.trim();
+                <div
+                  onClick={(e) =>
+                    handleElementClick(e, "content.description", content.description)
+                  }
+                  className={`mt-6 text-sm md:text-base text-slate-600 font-sans ${editableClass(
+                    "content.description"
+                  )}`}
+                >
+                  {content.description.split("\n").map((line: string, index: number) => {
+                    const text = line.trim();
 
-    if (!text) return <div key={index} className="h-4" />;
+                    if (!text) return <div key={index} className="h-4" />;
 
-    // Only lines starting with ► get different styling
-    if (text.startsWith("►")) {
-      return (
-        <p
-          key={index}
-          className="leading-8 mt-4 flex items-start"
-        >
-          <span className="mr-3 text-[#002060] font-semibold">►</span>
-          <span>{text.substring(1).trim()}</span>
-        </p>
-      );
-    }
+                    // Only lines starting with ► get different styling
+                    if (text.startsWith("►")) {
+                      return (
+                        <p
+                          key={index}
+                          className="leading-8 mt-4 flex items-start"
+                        >
+                          <span className="mr-3 text-[#002060] font-semibold">►</span>
+                          <span>{text.substring(1).trim()}</span>
+                        </p>
+                      );
+                    }
 
-    // Normal paragraph
-    return (
-      <p
-        key={index}
-        className="leading-8 mb-3"
-      >
-        {text}
-      </p>
-    );
-  })}
-</div>
+                    // Normal paragraph
+                    return (
+                      <p
+                        key={index}
+                        className="leading-8 mb-3"
+                      >
+                        {text}
+                      </p>
+                    );
+                  })}
+                </div>
               </div>
               {/* RIGHT COLUMN: FOUNDER PROFILE CARD */}
               <div className="md:col-span-5 flex justify-center md:justify-end">
@@ -1499,153 +1502,153 @@ export default function DynamicSection({
                 </div>
               </div>
             </div>
-              {/* MISSION STATEMENT ROW */}
-              <div className="flex items-start gap-5 mt-10 text-left">
-                <div
-                  onClick={(e) => handleElementClick(e, 'content.missionImage', content.missionImage || "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=300")}
-                  className={`w-16 h-16 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-center shrink-0 shadow-sm overflow-hidden cursor-pointer ${editableClass('content.missionImage')}`}
-                  title="Click to edit Mission Image"
-                >
-                  <img
-                    src={content.missionImage || "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=300"}
-                    alt="Mission"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h3
-                    onClick={(e) => handleElementClick(e, 'content.missionTitle', content.missionTitle)}
-                    className={`text-xl font-display font-extrabold text-slate-900 ${editableClass('content.missionTitle')}`}
-                  >
-                    {content.missionTitle || "Our Mission"}
-                  </h3>
-                <div
-  onClick={(e) => handleElementClick(e, 'content.missionDesc', content.missionDesc)}
-  className={`mt-1 text-sm text-slate-600 font-sans ${editableClass('content.missionDesc')}`}
->
-  {content.missionDesc.split('\n').map((line: string, index: number) => {
-    const text = line.trim();
-
-    if (!text) return <div key={index} className="h-3" />;
-
-    if (text.startsWith('►')) {
-      return (
-        <div
-          key={index}
-          className="flex items-start mt-3"
-        >
-          <span className="mr-2 font-semibold text-[#002060]">►</span>
-          <span className="leading-7">{text.substring(1).trim()}</span>
-        </div>
-      );
-    }
-
-    return (
-      <p
-        key={index}
-        className="leading-7 mb-2"
-      >
-        {text}
-      </p>
-    );
-  })}
-</div>
-                </div>
+            {/* MISSION STATEMENT ROW */}
+            <div className="flex items-start gap-5 mt-10 text-left">
+              <div
+                onClick={(e) => handleElementClick(e, 'content.missionImage', content.missionImage || "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=300")}
+                className={`w-16 h-16 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-center shrink-0 shadow-sm overflow-hidden cursor-pointer ${editableClass('content.missionImage')}`}
+                title="Click to edit Mission Image"
+              >
+                <img
+                  src={content.missionImage || "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=300"}
+                  alt="Mission"
+                  className="w-full h-full object-cover"
+                />
               </div>
-
-              {/* VISION STATEMENT ROW */}
-              <div className="flex items-start gap-5 mt-8 text-left">
-                <div
-                  onClick={(e) => handleElementClick(e, 'content.visionImage', content.visionImage || "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=300")}
-                  className={`w-16 h-16 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-center shrink-0 shadow-sm overflow-hidden cursor-pointer ${editableClass('content.visionImage')}`}
-                  title="Click to edit Vision Image"
+              <div className="flex-1">
+                <h3
+                  onClick={(e) => handleElementClick(e, 'content.missionTitle', content.missionTitle)}
+                  className={`text-xl font-display font-extrabold text-slate-900 ${editableClass('content.missionTitle')}`}
                 >
-                  <img
-                    src={content.visionImage || "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=300"}
-                    alt="Vision"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h3
-                    onClick={(e) => handleElementClick(e, 'content.visionTitle', content.visionTitle)}
-                    className={`text-xl font-display font-extrabold text-slate-900 ${editableClass('content.visionTitle')}`}
-                  >
-                    {content.visionTitle || "Our Vision"}
-                  </h3>
-                   <div
-  onClick={(e) => handleElementClick(e, 'content.visionDesc', content.visionDesc)}
-  className={`mt-1 text-sm text-slate-600 font-sans ${editableClass('content.visionDesc')}`}
->
-  {content.visionDesc.split('\n').map((line: string, index: number) => {
-    const text = line.trim();
-
-    if (!text) return <div key={index} className="h-3" />;
-
-    if (text.startsWith('►')) {
-      return (
-        <div key={index} className="flex items-start mt-3">
-          <span className="mr-2 font-semibold text-[#002060]">►</span>
-          <span className="leading-7">{text.substring(1).trim()}</span>
-        </div>
-      );
-    }
-
-    return (
-      <p key={index} className="leading-7 mb-2">
-        {text}
-      </p>
-    );
-  })}
-</div>
-                </div>
-              </div>
-
-              {/* WHY CHOOSE US ROW */}
-              <div className="flex items-start gap-5 mt-8 text-left">
+                  {content.missionTitle || "Our Mission"}
+                </h3>
                 <div
-                  onClick={(e) => handleElementClick(e, 'content.whyImage', content.whyImage || "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=300")}
-                  className={`w-16 h-16 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-center shrink-0 shadow-sm overflow-hidden cursor-pointer ${editableClass('content.whyImage')}`}
-                  title="Click to edit Why Us Image"
+                  onClick={(e) => handleElementClick(e, 'content.missionDesc', content.missionDesc)}
+                  className={`mt-1 text-sm text-slate-600 font-sans ${editableClass('content.missionDesc')}`}
                 >
-                  <img
-                    src={content.whyImage || "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=300"}
-                    alt="Why Choose Us"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h3
-                    onClick={(e) => handleElementClick(e, 'content.whyTitle', content.whyTitle)}
-                    className={`text-xl font-display font-extrabold text-slate-900 ${editableClass('content.whyTitle')}`}
-                  >
-                    {content.whyTitle || "Why Choose Us?"}
-                  </h3>
+                  {content.missionDesc.split('\n').map((line: string, index: number) => {
+                    const text = line.trim();
 
-                  {/* Checklist */}
-                  <div className="flex flex-col gap-3 mt-4">
-                    {(content.whyPoints || []).map((pt: any, idx: number) => (
-                      <div key={pt.id || idx} className="flex items-start gap-2.5 text-left">
-                        <div className="bg-blue-50 text-blue-600 rounded-full p-0.5 mt-0.5 shrink-0">
-                          <svg className="w-4 h-4 stroke-[3px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <span
-                          onClick={(e) => handleElementClick(e, `content.whyPoints.${idx}.text`, pt.text)}
-                          className={`text-sm md:text-base font-semibold text-slate-800 ${editableClass(`content.whyPoints.${idx}.text`)}`}
+                    if (!text) return <div key={index} className="h-3" />;
+
+                    if (text.startsWith('►')) {
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-start mt-3"
                         >
-                          {pt.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                          <span className="mr-2 font-semibold text-[#002060]">►</span>
+                          <span className="leading-7">{text.substring(1).trim()}</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <p
+                        key={index}
+                        className="leading-7 mb-2"
+                      >
+                        {text}
+                      </p>
+                    );
+                  })}
                 </div>
               </div>
+            </div>
+
+            {/* VISION STATEMENT ROW */}
+            <div className="flex items-start gap-5 mt-8 text-left">
+              <div
+                onClick={(e) => handleElementClick(e, 'content.visionImage', content.visionImage || "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=300")}
+                className={`w-16 h-16 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-center shrink-0 shadow-sm overflow-hidden cursor-pointer ${editableClass('content.visionImage')}`}
+                title="Click to edit Vision Image"
+              >
+                <img
+                  src={content.visionImage || "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=300"}
+                  alt="Vision"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="flex-1">
+                <h3
+                  onClick={(e) => handleElementClick(e, 'content.visionTitle', content.visionTitle)}
+                  className={`text-xl font-display font-extrabold text-slate-900 ${editableClass('content.visionTitle')}`}
+                >
+                  {content.visionTitle || "Our Vision"}
+                </h3>
+                <div
+                  onClick={(e) => handleElementClick(e, 'content.visionDesc', content.visionDesc)}
+                  className={`mt-1 text-sm text-slate-600 font-sans ${editableClass('content.visionDesc')}`}
+                >
+                  {content.visionDesc.split('\n').map((line: string, index: number) => {
+                    const text = line.trim();
+
+                    if (!text) return <div key={index} className="h-3" />;
+
+                    if (text.startsWith('►')) {
+                      return (
+                        <div key={index} className="flex items-start mt-3">
+                          <span className="mr-2 font-semibold text-[#002060]">►</span>
+                          <span className="leading-7">{text.substring(1).trim()}</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <p key={index} className="leading-7 mb-2">
+                        {text}
+                      </p>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* WHY CHOOSE US ROW */}
+            <div className="flex items-start gap-5 mt-8 text-left">
+              <div
+                onClick={(e) => handleElementClick(e, 'content.whyImage', content.whyImage || "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=300")}
+                className={`w-16 h-16 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-center shrink-0 shadow-sm overflow-hidden cursor-pointer ${editableClass('content.whyImage')}`}
+                title="Click to edit Why Us Image"
+              >
+                <img
+                  src={content.whyImage || "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=300"}
+                  alt="Why Choose Us"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="flex-1">
+                <h3
+                  onClick={(e) => handleElementClick(e, 'content.whyTitle', content.whyTitle)}
+                  className={`text-xl font-display font-extrabold text-slate-900 ${editableClass('content.whyTitle')}`}
+                >
+                  {content.whyTitle || "Why Choose Us?"}
+                </h3>
+
+                {/* Checklist */}
+                <div className="flex flex-col gap-3 mt-4">
+                  {(content.whyPoints || []).map((pt: any, idx: number) => (
+                    <div key={pt.id || idx} className="flex items-start gap-2.5 text-left">
+                      <div className="bg-blue-50 text-blue-600 rounded-full p-0.5 mt-0.5 shrink-0">
+                        <svg className="w-4 h-4 stroke-[3px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <span
+                        onClick={(e) => handleElementClick(e, `content.whyPoints.${idx}.text`, pt.text)}
+                        className={`text-sm md:text-base font-semibold text-slate-800 ${editableClass(`content.whyPoints.${idx}.text`)}`}
+                      >
+                        {pt.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
 
 
 
-            
+
           </div>
         )}
 
@@ -1869,7 +1872,7 @@ export default function DynamicSection({
                         e,
                         `content.services.${i}.image`,
                         serv.image ||
-                          "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=300"
+                        "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=300"
                       )
                     }
                     className={`flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 mb-1 cursor-pointer shrink-0 ${editableClass(
@@ -1905,7 +1908,7 @@ export default function DynamicSection({
                   >
                     {serv.desc || ''}
                   </p>
-                  
+
                   {serv.buttonText && serv.buttonLink && (
                     <a
                       href={serv.buttonLink}
@@ -2107,7 +2110,7 @@ export default function DynamicSection({
                         <span className="text-[10px] text-slate-400 font-mono">Class of {st.year}</span>
                       </div>
                     </div>
-                    
+
                     {/* Details Row: College & Branch */}
                     <div className="border-t border-slate-100 pt-3 flex flex-col gap-1">
                       <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">College & Branch</span>
@@ -2124,7 +2127,7 @@ export default function DynamicSection({
                           <span>{st.company}</span>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-col items-end gap-1">
                         <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Salary Package</span>
                         <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-full font-mono text-xs">
@@ -2171,8 +2174,8 @@ export default function DynamicSection({
                 });
 
               if (partnersLayout === 'carousel') {
-                const duplicatePartners = filteredPartners.length > 0 
-                  ? [...filteredPartners, ...filteredPartners, ...filteredPartners, ...filteredPartners] 
+                const duplicatePartners = filteredPartners.length > 0
+                  ? [...filteredPartners, ...filteredPartners, ...filteredPartners, ...filteredPartners]
                   : [];
                 return (
                   <div className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden py-8 sm:py-12 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 border-y border-slate-200/70 shadow-sm my-2">
@@ -2296,7 +2299,7 @@ export default function DynamicSection({
         {/* 14. COURSES TABS */}
         {type === 'courses-tabs' && (() => {
           const filteredCourses = allCourses.filter(c => c.category === activeCourseCategory);
-          
+
           const renderCourseLogo = (course: Course) => {
             if (course.imageUrl && (course.imageUrl.startsWith('http') || course.imageUrl.startsWith('/') || course.imageUrl.startsWith('data:'))) {
               return (
@@ -2350,7 +2353,7 @@ export default function DynamicSection({
                 </div>
               );
             }
-            
+
             // Standard generic fallback based on category
             return (
               <div className="w-16 h-16 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0 shadow-sm text-slate-400">
@@ -2866,7 +2869,7 @@ export default function DynamicSection({
                   ))}
                 </div>
 
-                <button 
+                <button
                   onClick={() => {
                     document.getElementById('ambassador-form-section')?.scrollIntoView({ behavior: 'smooth' });
                   }}
@@ -2879,9 +2882,9 @@ export default function DynamicSection({
               {/* Editable Campus Ambassador Image */}
               <div className="lg:col-span-6 flex justify-center items-center">
                 <div className="relative max-w-lg w-full rounded-2xl overflow-hidden shadow-xl border border-slate-100 bg-slate-50 p-4">
-                  <img 
-                    src={content.imageUrl || "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=800"} 
-                    alt="Campus Ambassador Illustration" 
+                  <img
+                    src={content.imageUrl || "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=800"}
+                    alt="Campus Ambassador Illustration"
                     className="w-full h-auto max-h-[400px] object-contain rounded-xl"
                     referrerPolicy="no-referrer"
                   />
@@ -2894,7 +2897,7 @@ export default function DynamicSection({
               <h3 className="font-display font-extrabold text-[#071B4D] text-2xl mb-8 text-center uppercase tracking-wide">
                 {content.formTitle || "Apply Now"}
               </h3>
-              
+
               {ambassadorSuccess ? (
                 <div className="p-8 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-center flex flex-col items-center gap-4 shadow-sm">
                   <Icons.CheckCircle className="h-16 w-16 text-emerald-500 animate-bounce" />
@@ -3038,7 +3041,7 @@ export default function DynamicSection({
               <h3 className="font-display font-extrabold text-[#071B4D] text-xl uppercase tracking-wider">
                 {content.pastAmbassadorsTitle || "Our Past Ambassadors"}
               </h3>
-              
+
               <div className="grid grid-cols-1 mobileL:grid-cols-2 md:grid-cols-4 gap-6">
                 {(content.pastAmbassadors || [
                   { id: "pa-1", year: "2019", title: "Joined Journey", desc: "Our pioneer campus crew began here." },
@@ -3106,171 +3109,45 @@ export default function DynamicSection({
 
         {/* 18. WORKSHOPS LIST */}
         {type === 'workshops-list' && (() => {
-          const defaultUpcoming = [
-            {
-              id: "wk-1",
-              title: "Resume Building Workshop",
-              desc: "Learn to build ATS friendly resume",
-              date: "25 May, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-2",
-              title: "Interview Preparation Workshop",
-              desc: "Crack interviews with confidence",
-              date: "01 June, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1573497191269-cc6db3aad297?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-3",
-              title: "Group Discussion & Pitching Techniques",
-              desc: "Learn to lead group discussions. Gain templates to pitch your solutions confidently.",
-              date: "15 June, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-4",
-              title: "LinkedIn Branding & Recruiter Outreach",
-              desc: "Learn secrets to draft a profile summary, customize headlines, and message HRs directly.",
-              date: "22 June, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-5",
-              title: "Quantitative Aptitude & Speed Math Hacks",
-              desc: "Crack high-frequency aptitude questions and speed calculation patterns.",
-              date: "29 June, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            },
-            {
-              id: "wk-6",
-              title: "System Design & Live Mock Coding Round",
-              desc: "Observe a live simulated interview mimicking Tier-1 tech company rounds.",
-              date: "06 July, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming"
-            }
-          ];
+          // Strictly read real workshops from database / CMS - NO dummy fallbacks
+          const rawWorkshops: WorkshopItem[] = Array.isArray(content.workshops) ? content.workshops : [];
 
-          const defaultPast = [
-            {
-              id: "past-1",
-              title: "React & Frontend Architecture BootCamp",
-              desc: "A 2-day session covering component optimization, server rendering, and modern state managers.",
-              date: "10 May, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-2",
-              title: "Java Full-Stack & Microservices Seminar",
-              desc: "A hands-on walk-through of Spring Boot, API gateway setups, and database orchestration.",
-              date: "03 May, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-3",
-              title: "Campus to Corporate Transition Meet",
-              desc: "Essential soft-skills and workspace etiquette guidelines delivered by corporate HR headers.",
-              date: "25 April, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-4",
-              title: "SQL & Relational Database Essentials",
-              desc: "Master indexes, complex joins, subqueries, and execution plan optimizations for technical interviews.",
-              date: "18 April, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            }
-          ];
+          // Auto-classify by event date: If scheduled date has passed, automatically move to past workshops
+          const sortedUpcoming = rawWorkshops
+            .filter((w: WorkshopItem) => !isWorkshopPast(w))
+            .sort((a: WorkshopItem, b: WorkshopItem) => parseWorkshopDate(a.date).getTime() - parseWorkshopDate(b.date).getTime());
 
-           const rawWorkshops = content.workshops || [];
-          const isCustomized = content.isWorkshopsCustomized || false;
-
-          const userUpcoming = rawWorkshops.filter((w: any) => w.status !== 'past');
-          const userPast = rawWorkshops.filter((w: any) => w.status === 'past');
-
-          const mergedUpcoming = [...userUpcoming];
-          if (!isCustomized) {
-            defaultUpcoming.forEach((du) => {
-              if (!mergedUpcoming.some(w => w.title.toLowerCase() === du.title.toLowerCase() || w.id === du.id)) {
-                mergedUpcoming.push(du);
-              }
-            });
-          }
-
-          const mergedPast = [...userPast];
-          if (!isCustomized) {
-            defaultPast.forEach((dp) => {
-              if (!mergedPast.some(w => w.title.toLowerCase() === dp.title.toLowerCase() || w.id === dp.id)) {
-                mergedPast.push(dp);
-              }
-            });
-          }
-
-          // Elegant date parser
-          const parseWorkshopDate = (dateStr: string): Date => {
-            if (!dateStr) return new Date();
-            const cleanStr = dateStr.replace(/[,|]/g, ' ').replace(/\s+/g, ' ').trim();
-            const parsed = new Date(cleanStr);
-            if (!isNaN(parsed.getTime())) {
-              return parsed;
-            }
-            const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-            const parts = cleanStr.toLowerCase().split(' ');
-            let day = 1;
-            let month = 0;
-            let year = new Date().getFullYear();
-            for (const part of parts) {
-              const d = parseInt(part, 10);
-              if (!isNaN(d)) {
-                if (d > 31) year = d;
-                else day = d;
-              } else {
-                const foundMonth = months.findIndex(m => part.startsWith(m));
-                if (foundMonth !== -1) month = foundMonth;
-              }
-            }
-            return new Date(year, month, day);
-          };
-
-          // Upcoming is sorted ASCENDING (nearest first)
-          const sortedUpcoming = [...mergedUpcoming].sort((a, b) => {
-            return parseWorkshopDate(a.date).getTime() - parseWorkshopDate(b.date).getTime();
-          });
-
-          // Past is sorted DESCENDING (most recently completed first)
-          const sortedPast = [...mergedPast].sort((a, b) => {
-            return parseWorkshopDate(b.date).getTime() - parseWorkshopDate(a.date).getTime();
-          });
+          const sortedPast = rawWorkshops
+            .filter((w: WorkshopItem) => isWorkshopPast(w))
+            .sort((a: WorkshopItem, b: WorkshopItem) => parseWorkshopDate(b.date).getTime() - parseWorkshopDate(a.date).getTime());
 
           const currentList = activeWorkshopTab === 'upcoming' ? sortedUpcoming : sortedPast;
           const displayedWorkshops = activeWorkshopTab === 'gallery' ? [] : currentList;
           const hasMore = activeWorkshopTab !== 'gallery' && currentList.length > visibleWorkshopsCount;
 
+          // Aggregated glimpses strictly from database uploaded photos - NO dummy Unsplash fallbacks
+          const allGlimpses = getAllWorkshopGlimpses(rawWorkshops, content.galleryImages || []);
+
+          // Workshop filter pills for Glimpses
+          const glimpseFilters = [
+            { id: 'all', title: 'All Photos', count: allGlimpses.length },
+            ...Array.from(new Set(allGlimpses.map(g => g.workshopTitle).filter(Boolean))).map(t => ({
+              id: t as string,
+              title: t as string,
+              count: allGlimpses.filter(g => g.workshopTitle === t).length
+            }))
+          ];
+
+          const filteredGlimpses = selectedGlimpseWorkshopFilter === 'all'
+            ? allGlimpses
+            : allGlimpses.filter(g => g.workshopTitle === selectedGlimpseWorkshopFilter);
+
+
           // HELPER: Canvas Admit Card Generator
           const triggerCanvasDownload = (student: any) => {
             const qrImg = new Image();
             qrImg.crossOrigin = "anonymous";
-            
+
             const renderCanvas = (qrImageElement: HTMLImageElement | null) => {
               const canvas = document.createElement('canvas');
               canvas.width = 750;
@@ -3523,8 +3400,8 @@ export default function DynamicSection({
               {regWorkshop && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto text-left">
                   <div className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full border border-slate-200 shadow-2xl flex flex-col gap-6 relative animate-scale-up text-slate-800">
-                    <button 
-                      onClick={() => setRegWorkshop(null)} 
+                    <button
+                      onClick={() => setRegWorkshop(null)}
                       className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer text-sm font-bold z-10 font-sans"
                     >
                       ✕
@@ -3559,14 +3436,14 @@ export default function DynamicSection({
                               notes: { type: 'workshop', workshopId: regWorkshop.id || regWorkshop.title }
                             })
                           });
-                          
+
                           let activeKey = razorpayKeyId;
                           if (!activeKey) {
                             try {
                               const kr = await fetch('/api/razorpay-key');
                               const kd = await kr.json();
                               if (kd.keyId) activeKey = kd.keyId;
-                            } catch (e) {}
+                            } catch (e) { }
                           }
 
                           let orderData = { keyId: activeKey, order: { id: null } };
@@ -3580,7 +3457,7 @@ export default function DynamicSection({
                             const errData = await orderRes.json().catch(() => ({}));
                             throw new Error(errData.error || `Workshop order creation failed (status ${orderRes.status})`);
                           }
-                          
+
                           const loaded = await loadRazorpayScript();
                           const effectiveKey = orderData?.keyId || activeKey;
                           if (!effectiveKey) {
@@ -3623,14 +3500,14 @@ export default function DynamicSection({
                         }
                       }
                     }} className="flex flex-col gap-4 font-sans text-xs">
-                      
+
                       <div className="flex flex-col gap-1.5">
                         <label className="font-bold text-slate-700 uppercase tracking-wider text-[9px]">Full Name *</label>
                         <input
                           type="text"
                           required
                           value={regForm.name}
-                          onChange={(e) => setRegForm({...regForm, name: e.target.value})}
+                          onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
                           placeholder="Enter your official name"
                           className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800"
                         />
@@ -3643,7 +3520,7 @@ export default function DynamicSection({
                             type="email"
                             required
                             value={regForm.email}
-                            onChange={(e) => setRegForm({...regForm, email: e.target.value})}
+                            onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
                             placeholder="username@domain.com"
                             className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800"
                           />
@@ -3655,7 +3532,7 @@ export default function DynamicSection({
                             type="tel"
                             required
                             value={regForm.phone}
-                            onChange={(e) => setRegForm({...regForm, phone: e.target.value})}
+                            onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
                             placeholder="e.g. +91 98765 43210"
                             className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800"
                           />
@@ -3668,7 +3545,7 @@ export default function DynamicSection({
                           type="text"
                           required
                           value={regForm.college}
-                          onChange={(e) => setRegForm({...regForm, college: e.target.value})}
+                          onChange={(e) => setRegForm({ ...regForm, college: e.target.value })}
                           placeholder="Institute of Technology, Bhopal"
                           className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800"
                         />
@@ -3681,7 +3558,7 @@ export default function DynamicSection({
                             type="text"
                             required
                             value={regForm.branch}
-                            onChange={(e) => setRegForm({...regForm, branch: e.target.value})}
+                            onChange={(e) => setRegForm({ ...regForm, branch: e.target.value })}
                             placeholder="e.g. Computer Science (CSE)"
                             className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800"
                           />
@@ -3691,7 +3568,7 @@ export default function DynamicSection({
                           <label className="font-bold text-slate-700 uppercase tracking-wider text-[9px]">Year of Study *</label>
                           <select
                             value={regForm.year}
-                            onChange={(e) => setRegForm({...regForm, year: e.target.value})}
+                            onChange={(e) => setRegForm({ ...regForm, year: e.target.value })}
                             className="px-4 py-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800"
                           >
                             <option>1st Year</option>
@@ -3730,7 +3607,7 @@ export default function DynamicSection({
               {isPaying && regWorkshop && (
                 <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className="bg-[#0b1222] text-white rounded-3xl w-full max-w-md overflow-hidden border border-slate-800 shadow-2xl animate-scale-up">
-                    
+
                     {/* Header simulating true Razorpay Checkout */}
                     <div className="bg-[#131a2e] p-5 border-b border-slate-850 flex items-center justify-between text-left">
                       <div className="flex items-center gap-2">
@@ -3740,8 +3617,8 @@ export default function DynamicSection({
                           <div className="text-[10px] text-slate-400">TANTRA PEX ONLINE PAYMENTS</div>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => setIsPaying(false)} 
+                      <button
+                        onClick={() => setIsPaying(false)}
                         className="text-slate-500 hover:text-white transition-colors text-sm cursor-pointer"
                       >
                         ✕ Cancel
@@ -3764,7 +3641,7 @@ export default function DynamicSection({
                       {/* Mock Payment Options Selector */}
                       <div className="flex flex-col gap-2.5">
                         <span className="font-bold text-slate-400 uppercase tracking-wider text-[8px]">Select Payment Channel</span>
-                        
+
                         <button
                           onClick={() => simulateRazorpaySuccess('UPI-MOBILE-REF')}
                           className="p-3.5 bg-[#17223b] hover:bg-[#1f2e50] border border-slate-800 rounded-xl flex items-center justify-between cursor-pointer transition-colors text-left font-sans"
@@ -3835,7 +3712,7 @@ export default function DynamicSection({
 
                     {/* Highly stylized visual pass pass boarding style card */}
                     <div className={`p-5 rounded-2xl border ${paymentSuccessData.isFree ? 'border-emerald-600/50 bg-emerald-950/10' : 'border-blue-600/50 bg-blue-950/10'} relative overflow-hidden flex flex-col gap-4 shadow-inner`}>
-                      
+
                       {/* Grid background visual */}
                       <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none"></div>
 
@@ -3933,13 +3810,13 @@ export default function DynamicSection({
               {selectedWorkshopDetail && (
                 <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
                   <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full border border-slate-100 shadow-2xl flex flex-col gap-6 relative">
-                    <button 
-                      onClick={() => setSelectedWorkshopDetail(null)} 
+                    <button
+                      onClick={() => setSelectedWorkshopDetail(null)}
                       className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer text-sm font-bold z-10"
                     >
                       ✕
                     </button>
-                    
+
                     <div className="h-56 md:h-72 w-full rounded-2xl overflow-hidden shadow-md border border-slate-100 shrink-0">
                       <img src={selectedWorkshopDetail.image} alt={selectedWorkshopDetail.title} className="w-full h-full object-cover" />
                     </div>
@@ -3976,16 +3853,25 @@ export default function DynamicSection({
                     </div>
 
                     <div className="flex gap-3 mt-2 border-t border-slate-100 pt-5">
-                      <button
-                        onClick={() => {
-                          const wk = selectedWorkshopDetail;
-                          setSelectedWorkshopDetail(null);
-                          setRegWorkshop(wk);
-                        }}
-                        className="flex-1 py-3.5 bg-[#071B4D] hover:bg-blue-900 text-white font-sans font-black uppercase tracking-wider text-xs rounded-xl shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer text-center"
-                      >
-                        Register For This Session
-                      </button>
+                      {isWorkshopPast(selectedWorkshopDetail) ? (
+                        <button
+                          disabled
+                          className="flex-1 py-3.5 bg-slate-100 text-slate-400 font-sans font-bold uppercase tracking-wider text-xs rounded-xl border border-slate-200 cursor-not-allowed text-center"
+                        >
+                          Session Concluded (Registration Closed)
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            const wk = selectedWorkshopDetail;
+                            setSelectedWorkshopDetail(null);
+                            setRegWorkshop(wk);
+                          }}
+                          className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-sans font-black uppercase tracking-wider text-xs rounded-xl shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer text-center"
+                        >
+                          Register For This Session
+                        </button>
+                      )}
                       <button
                         onClick={() => setSelectedWorkshopDetail(null)}
                         className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center"
@@ -3998,296 +3884,355 @@ export default function DynamicSection({
               )}
 
               <div className="text-center max-w-3xl mx-auto mb-10 flex flex-col gap-2">
-                <h2 className="text-3xl md:text-5xl font-display font-black tracking-tight" style={{ color: design.headingColor }}>
+                <h2 className="text-3xl md:text-5xl font-display font-black tracking-tight text-slate-900" style={{ color: design.headingColor }}>
                   {title}
                 </h2>
                 {subtitle && <p className="text-slate-500 text-sm md:text-base font-sans mt-1">{subtitle}</p>}
               </div>
 
-              {/* Tabs filter matching exact screenshot */}
+              {/* Modern tabs filter with dynamic item counts */}
               <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4 mb-12 text-xs md:text-sm font-sans">
                 <button
                   onClick={() => {
                     setActiveWorkshopTab('upcoming');
-                    setVisibleWorkshopsCount(2);
+                    setVisibleWorkshopsCount(6);
                   }}
-                  className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold transition-all border ${
+                  className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all border cursor-pointer ${
                     activeWorkshopTab === 'upcoming'
-                      ? 'bg-[#071B4D] text-white border-[#071B4D] shadow-lg'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-sm'
                   }`}
                 >
-                  <Icons.Calendar className="h-4 w-4 shrink-0" />
+                  <Icons.Calendar className="h-4 w-4 shrink-0 text-emerald-500" />
                   <span>Upcoming Workshops</span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${activeWorkshopTab === 'upcoming' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {sortedUpcoming.length}
+                  </span>
                 </button>
                 <button
                   onClick={() => {
                     setActiveWorkshopTab('past');
-                    setVisibleWorkshopsCount(2);
+                    setVisibleWorkshopsCount(6);
                   }}
-                  className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold transition-all border ${
+                  className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all border cursor-pointer ${
                     activeWorkshopTab === 'past'
-                      ? 'bg-[#071B4D] text-white border-[#071B4D] shadow-lg'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-sm'
                   }`}
                 >
-                  <Icons.History className="h-4 w-4 shrink-0" />
+                  <Icons.History className="h-4 w-4 shrink-0 text-slate-400" />
                   <span>Past Workshops</span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${activeWorkshopTab === 'past' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {sortedPast.length}
+                  </span>
                 </button>
                 <button
                   onClick={() => {
                     setActiveWorkshopTab('gallery');
                   }}
-                  className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold transition-all border ${
+                  className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all border cursor-pointer ${
                     activeWorkshopTab === 'gallery'
-                      ? 'bg-[#071B4D] text-white border-[#071B4D] shadow-lg'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-sm'
                   }`}
                 >
-                  <Icons.Image className="h-4 w-4 shrink-0" />
-                  <span>Gallery</span>
+                  <Icons.Image className="h-4 w-4 shrink-0 text-blue-500" />
+                  <span>Glimpses & Gallery</span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${activeWorkshopTab === 'gallery' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {allGlimpses.length}
+                  </span>
                 </button>
               </div>
 
               {activeWorkshopTab !== 'gallery' ? (
-                <div className="flex flex-col gap-8">
-                  {/* Top 2 Hero Cards matching exact screenshot */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left text-xs font-sans">
-                    {/* Hero Card 1 (Nearest / Most Recent) - Dark Theme */}
-                    {displayedWorkshops[0] && (() => {
-                      const wk = displayedWorkshops[0];
-                      return (
-                        <div className="bg-gradient-to-br from-slate-950 via-[#071B4D] to-slate-900 text-white rounded-3xl border border-slate-800 p-8 md:p-10 flex flex-col md:flex-row gap-6 shadow-xl relative overflow-hidden group">
-                          {/* Content Container */}
-                          <div className="flex flex-col justify-between gap-6 md:w-3/5 z-10">
-                            <div className="flex flex-col gap-3">
-                              <h3 
-                                onClick={() => setSelectedWorkshopDetail(wk)}
-                                className="text-2xl md:text-3xl font-display font-black tracking-tight text-white leading-tight cursor-pointer hover:text-[#F7C400] transition-colors"
-                              >
-                                {wk.title}
-                              </h3>
-                              <p className="text-slate-300 font-sans leading-relaxed text-sm">
-                                {wk.desc}
-                              </p>
-                              
-                              <div className="flex items-center gap-2 text-slate-300 text-xs font-semibold mt-4">
-                                <Icons.Calendar className="h-4.5 w-4.5 text-[#F7C400] shrink-0" />
-                                <span className="font-mono">
-                                  {wk.date} | {wk.location} | <strong className="text-[#F7C400] tracking-wider uppercase font-sans text-[10px] bg-[#F7C400]/10 border border-[#F7C400]/25 px-2 py-0.5 rounded-md ml-1">{wk.isFree ? 'FREE' : `₹${wk.price || 499}`}</strong>
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2.5 items-center">
-                              <button
-                                onClick={() => setRegWorkshop(wk)}
-                                className="px-6 py-3.5 bg-[#F7C400] hover:bg-yellow-400 text-[#071B4D] font-sans font-black uppercase tracking-wider text-xs rounded-xl shadow-lg transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer w-fit"
-                              >
-                                Register Now
-                              </button>
-                              <button
-                                onClick={() => setSelectedWorkshopDetail(wk)}
-                                className="px-6 py-3.5 bg-slate-800 hover:bg-slate-750 text-white font-sans font-bold uppercase tracking-wider text-xs rounded-xl shadow transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer w-fit"
-                              >
-                                View Details
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Image Container with seamless fade blending */}
-                          <div 
-                            onClick={() => setSelectedWorkshopDetail(wk)}
-                            className="relative md:w-2/5 min-h-[220px] md:min-h-full rounded-2xl overflow-hidden shadow border border-white/5 shrink-0 self-stretch cursor-pointer"
-                          >
-                            <img src={wk.image} alt={wk.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/20 to-transparent pointer-events-none hidden md:block" />
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Hero Card 2 (Second Nearest / Second Most Recent) - Light Theme */}
-                    {displayedWorkshops[1] && (() => {
-                      const wk = displayedWorkshops[1];
-                      return (
-                        <div className="bg-white text-slate-800 rounded-3xl border border-slate-200 p-8 md:p-10 flex flex-col md:flex-row gap-6 shadow-lg relative overflow-hidden group">
-                          {/* Content Container */}
-                          <div className="flex flex-col justify-between gap-6 md:w-3/5 z-10">
-                            <div className="flex flex-col gap-3">
-                              <h3 
-                                onClick={() => setSelectedWorkshopDetail(wk)}
-                                className="text-2xl md:text-3xl font-display font-black tracking-tight text-slate-900 leading-tight cursor-pointer hover:text-blue-600 transition-colors"
-                              >
-                                {wk.title}
-                              </h3>
-                              <p className="text-slate-500 font-sans leading-relaxed text-sm">
-                                {wk.desc}
-                              </p>
-                              
-                              <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold mt-4">
-                                <Icons.Calendar className="h-4.5 w-4.5 text-[#071B4D] shrink-0" />
-                                <span className="font-mono">
-                                  {wk.date} | {wk.location} | <strong className="text-blue-700 tracking-wider uppercase font-sans text-[10px] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md ml-1">{wk.isFree ? 'FREE' : `₹${wk.price || 499}`}</strong>
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2.5 items-center">
-                              <button
-                                onClick={() => setRegWorkshop(wk)}
-                                className="px-6 py-3.5 bg-[#F7C400] hover:bg-yellow-400 text-[#071B4D] font-sans font-black uppercase tracking-wider text-xs rounded-xl shadow-md transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer w-fit"
-                              >
-                                Register Now
-                              </button>
-                              <button
-                                onClick={() => setSelectedWorkshopDetail(wk)}
-                                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-bold uppercase tracking-wider text-xs rounded-xl shadow transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer w-fit border border-slate-200"
-                              >
-                                View Details
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Image Container with seamless fade blending */}
-                          <div 
-                            onClick={() => setSelectedWorkshopDetail(wk)}
-                            className="relative md:w-2/5 min-h-[220px] md:min-h-full rounded-2xl overflow-hidden shadow border border-slate-100 shrink-0 self-stretch cursor-pointer"
-                          >
-                            <img src={wk.image} alt={wk.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/20 to-transparent pointer-events-none hidden md:block" />
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Subsequent Workshops under top 2, displayed when user clicks 'Load More' */}
-                  {visibleWorkshopsCount > 2 && displayedWorkshops.length > 2 && (
-                    <div className="mt-8 border-t border-slate-100 pt-8 animate-fade-in">
-                      <h4 className="text-base font-bold text-slate-900 mb-6 font-display flex items-center gap-2 uppercase tracking-wider text-[11px] text-slate-400">
-                        <span>Additional {activeWorkshopTab === 'upcoming' ? 'Upcoming' : 'Past'} Sessions</span>
-                      </h4>
-                      <div className="grid grid-cols-1 mobileL:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {displayedWorkshops.slice(2, visibleWorkshopsCount).map((wk: any, i: number) => (
+                <div className="flex flex-col gap-12">
+                  {/* Empty state when no workshops in current filter */}
+                  {currentList.length === 0 ? (
+                    <div className="text-center py-16 px-6 bg-slate-50/70 rounded-3xl border border-dashed border-slate-200 max-w-lg mx-auto flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                        <Icons.Calendar className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-base font-bold text-slate-800 font-display">
+                        No {activeWorkshopTab === 'upcoming' ? 'Upcoming' : 'Past'} Workshops Found
+                      </h3>
+                      <p className="text-slate-500 text-xs font-sans max-w-sm">
+                        {activeWorkshopTab === 'upcoming'
+                          ? 'New technical workshops and placement clinics will be announced soon. Stay tuned!'
+                          : 'No completed workshops on record yet.'}
+                      </p>
+                    </div>
+                  ) : (
+                    /* Uniform, premium responsive cards grid */
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+                      {currentList.slice(0, visibleWorkshopsCount).map((wk: any, i: number) => {
+                        const past = isWorkshopPast(wk);
+                        return (
                           <div
                             key={wk.id || i}
-                            style={{ backgroundColor: design.cardBackgroundColor, borderColor: design.borderColor }}
-                            className="bg-white rounded-2xl border p-6 flex flex-col justify-between gap-5 shadow-sm hover:border-slate-300 hover:shadow transition-all text-left group animate-fade-in"
+                            className="bg-white rounded-2xl border border-slate-200/80 p-5 flex flex-col justify-between gap-5 shadow-sm hover:shadow-xl hover:border-slate-300 transition-all duration-300 group"
                           >
-                            <div className="flex flex-col gap-3">
-                              <div 
+                            <div className="flex flex-col gap-3.5">
+                              {/* Workshop Image Cover */}
+                              <div
                                 onClick={() => setSelectedWorkshopDetail(wk)}
-                                className="h-44 rounded-xl overflow-hidden relative cursor-pointer"
+                                className="h-48 rounded-xl overflow-hidden relative cursor-pointer bg-slate-100"
                               >
-                                <img src={wk.image} alt={wk.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                <div className="absolute top-2 right-2 px-2.5 py-1 bg-white/90 backdrop-blur-sm rounded-lg text-[10px] font-bold text-blue-700 shadow-sm font-mono uppercase">
-                                  {wk.location}
+                                <img
+                                  src={wk.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=600'}
+                                  alt={wk.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                />
+                                {/* Status badge */}
+                                <div className="absolute top-2.5 left-2.5">
+                                  {past ? (
+                                    <span className="px-2.5 py-1 bg-slate-900/85 backdrop-blur-sm text-slate-300 text-[10px] font-bold rounded-lg uppercase tracking-wider font-mono">
+                                      Concluded
+                                    </span>
+                                  ) : (
+                                    <span className="px-2.5 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded-lg uppercase tracking-wider shadow-sm font-mono">
+                                      Upcoming
+                                    </span>
+                                  )}
                                 </div>
+                                {/* Location badge */}
+                                <div className="absolute top-2.5 right-2.5 px-2.5 py-1 bg-white/95 backdrop-blur-sm rounded-lg text-[10px] font-bold text-slate-800 shadow-sm font-mono uppercase flex items-center gap-1">
+                                  <Icons.MapPin className="h-3 w-3 text-slate-500" />
+                                  <span>{wk.location}</span>
+                                </div>
+                                {/* Photo count if workshop has photos */}
+                                {Array.isArray(wk.images) && wk.images.length > 0 && (
+                                  <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-[10px] font-bold text-white shadow-sm font-mono flex items-center gap-1">
+                                    <Icons.Camera className="h-3 w-3 text-emerald-400" />
+                                    <span>{wk.images.length} photos</span>
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex items-center gap-2 text-[10px] text-blue-600 font-bold font-mono">
-                                <Icons.Calendar className="h-3.5 w-3.5" />
-                                <span>{wk.date}</span>
-                                <span className="text-slate-300 font-sans">•</span>
-                                <span className={wk.isFree ? "text-emerald-600 uppercase font-black" : "text-blue-700 uppercase font-black"}>
-                                  {wk.isFree ? "FREE" : `₹${wk.price || 499}`}
+
+                              {/* Date & Price Row */}
+                              <div className="flex items-center justify-between text-xs font-semibold">
+                                <div className="flex items-center gap-1.5 text-slate-600 font-mono">
+                                  <Icons.Calendar className="h-3.5 w-3.5 text-slate-400" />
+                                  <span>{wk.date}</span>
+                                </div>
+                                <span className={wk.isFree ? "px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase rounded border border-emerald-100" : "px-2 py-0.5 bg-slate-100 text-slate-900 text-[10px] font-black uppercase rounded font-mono border border-slate-200"}>
+                                  {wk.isFree ? "FREE PASS" : `₹${wk.price || 499}`}
                                 </span>
                               </div>
-                              <h3 
+
+                              {/* Title & Description */}
+                              <h3
                                 onClick={() => setSelectedWorkshopDetail(wk)}
-                                className="text-sm font-display font-bold text-slate-900 group-hover:text-blue-600 transition-colors cursor-pointer"
+                                className="text-base font-display font-bold text-slate-900 group-hover:text-blue-600 transition-colors cursor-pointer line-clamp-2 leading-snug"
                               >
                                 {wk.title}
                               </h3>
-                              <p className="text-slate-500 font-sans leading-relaxed text-[11px]">{wk.desc}</p>
+                              <p className="text-slate-500 font-sans leading-relaxed text-xs line-clamp-2">
+                                {wk.desc}
+                              </p>
                             </div>
-                            <div className="flex flex-col gap-2">
-                              <button
-                                onClick={() => setRegWorkshop(wk)}
-                                className="w-full py-2.5 bg-[#071B4D] hover:bg-blue-900 text-white font-sans font-bold uppercase tracking-wider text-[10px] rounded-lg transition-colors cursor-pointer text-center"
-                              >
-                                Register Now
-                              </button>
+
+                            {/* Action Buttons: Past sessions disabled registration */}
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                              {past ? (
+                                <button
+                                  disabled
+                                  className="flex-1 py-2.5 px-3 bg-slate-100 text-slate-400 font-sans font-bold uppercase tracking-wider text-[10px] rounded-xl border border-slate-200 cursor-not-allowed text-center"
+                                  title="Registration is closed for completed sessions"
+                                >
+                                  Registration Closed
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setRegWorkshop(wk)}
+                                  className="flex-1 py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-sans font-bold uppercase tracking-wider text-[10px] rounded-xl shadow-sm hover:shadow transition-all cursor-pointer text-center"
+                                >
+                                  Register Now
+                                </button>
+                              )}
                               <button
                                 onClick={() => setSelectedWorkshopDetail(wk)}
-                                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-semibold uppercase tracking-wider text-[9px] rounded-lg border border-slate-200 transition-colors cursor-pointer text-center"
+                                className="py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 font-sans font-semibold uppercase tracking-wider text-[10px] rounded-xl border border-slate-200 transition-colors cursor-pointer text-center shadow-sm"
                               >
-                                View Details
+                                Details
                               </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Load More Workshops / Show Less */}
+                  {currentList.length > 6 && (
+                    <div className="flex justify-center">
+                      {visibleWorkshopsCount < currentList.length ? (
+                        <button
+                          onClick={() => setVisibleWorkshopsCount(prev => Math.min(prev + 6, currentList.length))}
+                          className="group flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md hover:shadow-lg cursor-pointer"
+                        >
+                          <span>Load More Workshops</span>
+                          <Icons.ChevronDown className="h-4 w-4 shrink-0 transition-transform group-hover:translate-y-0.5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setVisibleWorkshopsCount(6)}
+                          className="group flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm cursor-pointer"
+                        >
+                          <span>Show Less</span>
+                          <Icons.ChevronUp className="h-4 w-4 shrink-0" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Glimpses Section with dynamic workshop filter toggle */}
+                  <div className="mt-8 border-t border-slate-200 pt-12">
+                    <div className="text-center mb-6">
+                      <span className="text-xs font-black uppercase tracking-widest text-slate-400 font-mono">Glimpses from our Workshops</span>
+                      <h3 className="text-xl md:text-2xl font-display font-black text-slate-900 mt-1">
+                        Memories & Training Highlights
+                      </h3>
+                      <p className="text-slate-500 text-xs font-sans mt-1">Real moments and practical labs conducted across colleges & corporate venues</p>
+                    </div>
+
+                    {/* Workshop Filter Pills Toggle */}
+                    {glimpseFilters.length > 1 && (
+                      <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
+                        {glimpseFilters.map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => setSelectedGlimpseWorkshopFilter(f.id)}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
+                              selectedGlimpseWorkshopFilter === f.id
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>{f.title}</span>
+                            <span className="ml-1.5 opacity-70 font-mono text-[10px]">({f.count})</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {filteredGlimpses.length === 0 ? (
+                      <div className="text-center py-10 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-sans">
+                        No workshop glimpses uploaded yet. Admin can upload event photos in the Admin Panel.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {filteredGlimpses.slice(0, 8).map((g, picI) => (
+                          <div
+                            key={picI}
+                            onClick={() => setLightboxGlimpseIndex(picI)}
+                            className="relative rounded-2xl overflow-hidden border border-slate-200/70 shadow-sm aspect-[4/3] group bg-slate-100 cursor-pointer"
+                          >
+                            <img
+                              src={g.url}
+                              alt={g.workshopTitle || "Workshop Glimpse"}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3">
+                              <span className="text-white text-[11px] font-bold line-clamp-1">{g.workshopTitle || 'Workshop Highlight'}</span>
+                              <span className="text-slate-300 text-[9px] uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                                <Icons.Eye className="h-3 w-3" /> View Photo
+                              </span>
                             </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Glimpses horizontal row matching exact screenshot layout */}
-                  <div className="mt-16 border-t border-slate-150 pt-12">
-                    <div className="text-center mb-8">
-                      <span className="text-xs font-black uppercase tracking-widest text-slate-400 font-mono">Glimpses from our Workshops</span>
-                    </div>
-                    <div className="grid grid-cols-1 mobileL:grid-cols-2 md:grid-cols-4 gap-5">
-                      {(content.galleryImages && content.galleryImages.length > 0
-                        ? content.galleryImages.slice(0, 4)
-                        : [
-                            "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
-                            "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=400",
-                            "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=400",
-                            "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400"
-                          ]
-                      ).map((img: string, picI: number) => (
-                        <div key={picI} className="relative rounded-2xl overflow-hidden border border-slate-100 shadow-sm aspect-[4/3] group bg-slate-50">
-                          <img src={img} alt="Workshop Glimpse" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                          <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-colors duration-350" />
-                        </div>
-                      ))}
-                    </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 mobileL:grid-cols-2 md:grid-cols-4 gap-4 text-center text-xs font-sans">
-                  {(content.galleryImages && content.galleryImages.length > 0
-                    ? content.galleryImages
-                    : [
-                        "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
-                        "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=400",
-                        "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=400",
-                        "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400",
-                        "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=500",
-                        "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
-                        "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
-                        "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500"
-                      ]
-                  ).map((img: string, picI: number) => (
-                    <div key={picI} className="relative rounded-xl overflow-hidden group border border-slate-100 shadow-sm aspect-video bg-slate-50">
-                      <img src={img} alt="Workshop" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                /* Gallery Tab View with dynamic filter toggle */
+                <div className="flex flex-col gap-8">
+                  {glimpseFilters.length > 1 && (
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {glimpseFilters.map(f => (
+                        <button
+                          key={f.id}
+                          onClick={() => setSelectedGlimpseWorkshopFilter(f.id)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
+                            selectedGlimpseWorkshopFilter === f.id
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>{f.title}</span>
+                          <span className="ml-1.5 opacity-70 font-mono text-[10px]">({f.count})</span>
+                        </button>
+                      ))}
                     </div>
-                  ))}
+                  )}
+
+                  {filteredGlimpses.length === 0 ? (
+                    <div className="text-center py-16 px-6 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-slate-400 text-xs font-sans max-w-md mx-auto">
+                      No gallery photos available for this filter.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-center text-xs font-sans">
+                      {filteredGlimpses.map((g, picI) => (
+                        <div
+                          key={picI}
+                          onClick={() => setLightboxGlimpseIndex(picI)}
+                          className="relative rounded-xl overflow-hidden group border border-slate-200/80 shadow-sm aspect-video bg-slate-100 cursor-pointer"
+                        >
+                          <img src={g.url} alt={g.workshopTitle || "Workshop photo"} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5 text-left">
+                            <span className="text-white text-[10px] font-bold line-clamp-1">{g.workshopTitle || 'Workshop Highlight'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Load More Workshops / Show Less CTA matching user intent */}
-              {activeWorkshopTab !== 'gallery' && (
-                <div className="flex justify-center mt-12">
-                  {visibleWorkshopsCount < currentList.length ? (
+              {/* Lightbox Modal for Glimpses / Gallery photos */}
+              {lightboxGlimpseIndex !== null && filteredGlimpses[lightboxGlimpseIndex] && (
+                <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                  <button
+                    onClick={() => setLightboxGlimpseIndex(null)}
+                    className="absolute top-5 right-5 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-lg font-bold transition-colors cursor-pointer z-20"
+                  >
+                    ✕
+                  </button>
+
+                  {filteredGlimpses.length > 1 && (
                     <button
-                      onClick={() => setVisibleWorkshopsCount(prev => Math.min(prev + 2, currentList.length))}
-                      className="group flex items-center gap-2 px-8 py-4 bg-[#071B4D] hover:bg-blue-900 text-white font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 cursor-pointer"
+                      onClick={() => setLightboxGlimpseIndex((lightboxGlimpseIndex - 1 + filteredGlimpses.length) % filteredGlimpses.length)}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-colors cursor-pointer z-20"
                     >
-                      <span>Load More Workshops</span>
-                      <Icons.ChevronDown className="h-4 w-4 shrink-0 transition-transform group-hover:translate-y-1 animate-pulse" />
+                      <Icons.ChevronLeft className="h-6 w-6" />
                     </button>
-                  ) : (
-                    currentList.length > 2 && (
-                      <button
-                        onClick={() => setVisibleWorkshopsCount(2)}
-                        className="group flex items-center gap-2 px-8 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm hover:shadow-md transform hover:-translate-y-0.5 cursor-pointer"
-                      >
-                        <span>Show Less Sessions</span>
-                        <Icons.ChevronUp className="h-4 w-4 shrink-0" />
-                      </button>
-                    )
                   )}
+
+                  {filteredGlimpses.length > 1 && (
+                    <button
+                      onClick={() => setLightboxGlimpseIndex((lightboxGlimpseIndex + 1) % filteredGlimpses.length)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-colors cursor-pointer z-20"
+                    >
+                      <Icons.ChevronRight className="h-6 w-6" />
+                    </button>
+                  )}
+
+                  <div className="max-w-4xl max-h-[85vh] flex flex-col items-center gap-3">
+                    <img
+                      src={filteredGlimpses[lightboxGlimpseIndex].url}
+                      alt={filteredGlimpses[lightboxGlimpseIndex].workshopTitle || 'Workshop glimpse'}
+                      className="max-h-[75vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/10"
+                    />
+                    <div className="flex items-center gap-3 text-white text-xs font-sans">
+                      <span className="font-bold text-emerald-400">
+                        {filteredGlimpses[lightboxGlimpseIndex].workshopTitle || 'Workshop Highlight'}
+                      </span>
+                      <span className="text-white/40">•</span>
+                      <span className="text-slate-300 font-mono">
+                        {lightboxGlimpseIndex + 1} of {filteredGlimpses.length}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -4299,7 +4244,7 @@ export default function DynamicSection({
           <div className="flex flex-col gap-8">
             {/* Banner Badge */}
             <div className="flex justify-center pt-20 ">
-              
+
             </div>
 
             <div className="text-center max-w-3xl mx-auto mb-10 flex flex-col gap-3">
@@ -4315,11 +4260,10 @@ export default function DynamicSection({
                 <button
                   key={cat}
                   onClick={() => setActiveBlogCategory(cat)}
-                  className={`px-6 py-2.5 rounded-lg text-xs md:text-sm font-bold tracking-wide transition-all duration-200 border cursor-pointer ${
-                    activeBlogCategory === cat 
-                      ? 'bg-[#071B4D] text-white border-[#071B4D] shadow-md' 
+                  className={`px-6 py-2.5 rounded-lg text-xs md:text-sm font-bold tracking-wide transition-all duration-200 border cursor-pointer ${activeBlogCategory === cat
+                      ? 'bg-[#071B4D] text-white border-[#071B4D] shadow-md'
                       : 'bg-white text-[#071B4D] border-slate-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>
@@ -4380,7 +4324,7 @@ export default function DynamicSection({
             {/* Banner Badge */}
             <div className="flex justify-center">
               <span className="h-20">
-                
+
               </span>
             </div>
 
@@ -4394,14 +4338,14 @@ export default function DynamicSection({
 
             {/* Main 3-Column Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch mt-6 text-left text-sm font-sans">
-              
+
               {/* Left Column: Office Addresses & Contacts */}
               <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col gap-6 justify-between">
                 <div className="flex flex-col gap-6">
-                  {/* Bhopal Office / Indore Office */}
+                  {/* Indore HQ / Indore Office */}
                   {(content.offices || [
-                    { id: "of-1", name: "Bhopal Office", address: "123, Arera Colony, Bhopal, Madhya Pradesh - 462016" },
-                    { id: "of-2", name: "Indore Office", address: "456, Vijay Nagar, Indore, Madhya Pradesh - 452010" }
+                    { id: "of-1", name: "Indore Head Office", address: "3rd Floor, Prestige Vihar, Vijay Nagar, Scheme No 74C, Indore, Madhya Pradesh 452010" },
+                    { id: "of-2", name: "Indore Office", address: "3rd Floor, Prestige Vihar, Vijay Nagar, Scheme No 74C, Indore, Madhya Pradesh 452010" }
                   ]).map((office: any, i: number) => (
                     <div key={office.id || i} className="flex gap-4 items-start pb-5 border-b border-slate-100 last:border-0 last:pb-0">
                       <div className="p-3 bg-slate-50 rounded-xl text-[#071B4D] shrink-0 border border-slate-100">
@@ -4424,7 +4368,7 @@ export default function DynamicSection({
                       <Icons.Phone className="h-5 w-5" />
                     </div>
                     <span className="font-display font-black text-slate-950 text-base md:text-lg">
-                      {content.phone || "+91 93000 12345"}
+                      {content.phone || "+91 93023 70048"}
                     </span>
                   </div>
 
@@ -4434,7 +4378,7 @@ export default function DynamicSection({
                       <Icons.Mail className="h-5 w-5" />
                     </div>
                     <span className="font-display font-black text-slate-950 text-base md:text-lg break-all">
-                      {content.email || "info@tantrapex.com"}
+                      {content.email || "contact@tantrapex.com"}
                     </span>
                   </div>
 
@@ -4452,7 +4396,7 @@ export default function DynamicSection({
                 {/* Social links row */}
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <a
-                    href={settings.socialMedia?.linkedin || content.linkedin || "https://linkedin.com"}
+                    href={settings.socialMedia?.linkedin || content.linkedin || "https://linkedin.com/tantrapex"}
                     target="_blank"
                     rel="noreferrer"
                     className="p-3 bg-[#0077B5] hover:scale-105 hover:shadow-lg transition-all rounded-full text-white cursor-pointer"
@@ -4460,15 +4404,15 @@ export default function DynamicSection({
                     <Icons.Linkedin className="h-4 w-4" />
                   </a>
                   <a
-                    href={settings.socialMedia?.instagram || content.instagram || "https://instagram.com"}
+                    href={settings.socialMedia?.instagram || content.instagram || "https://instagram.com/tantrapex_technologies"}
                     target="_blank"
                     rel="noreferrer"
                     className="p-3 bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] hover:scale-105 hover:shadow-lg transition-all rounded-full text-white cursor-pointer"
                   >
                     <Icons.Instagram className="h-4 w-4" />
                   </a>
-                  <a
-                    href={settings.socialMedia?.youtube || content.youtube || "https://youtube.com"}
+                  {/* <a
+                    href={settings.socialMedia?.youtube || content.youtube}
                     target="_blank"
                     rel="noreferrer"
                     className="p-3 bg-[#FF0000] hover:scale-105 hover:shadow-lg transition-all rounded-full text-white cursor-pointer"
@@ -4492,7 +4436,7 @@ export default function DynamicSection({
                     >
                       <Icons.Twitter className="h-4 w-4" />
                     </a>
-                  )}
+                  )} */}
                 </div>
               </div>
 
@@ -4599,17 +4543,17 @@ export default function DynamicSection({
         {type === 'pricing-hero' && (
           <div className="relative w-full overflow-hidden bg-slate-950 rounded-2xl">
             {/* Desktop Background Image */}
-            <div 
+            <div
               className="hidden md:block absolute inset-0 bg-cover bg-center bg-no-repeat transition-all"
               style={{ backgroundImage: `url(${content.desktopBg || "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=1600"})` }}
             />
             {/* Mobile Background Image */}
-            <div 
+            <div
               className="block md:hidden absolute inset-0 bg-cover bg-center bg-no-repeat transition-all"
               style={{ backgroundImage: `url(${content.mobileBg || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800"})` }}
             />
             {/* Text Overlay Color and Opacity */}
-            <div 
+            <div
               className="absolute inset-0 z-10"
               style={{ backgroundColor: content.overlayColor || "rgba(7, 27, 77, 0.75)" }}
             />
@@ -4619,13 +4563,13 @@ export default function DynamicSection({
               <span className="text-xs font-black bg-amber-500 text-slate-950 px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
                 {content.tagline || "Secure Payments via Razorpay"}
               </span>
-              <h1 
+              <h1
                 onClick={(e) => handleElementClick(e, 'title', title)}
                 className="text-3xl md:text-6xl font-display font-black tracking-tight uppercase leading-none drop-shadow"
               >
                 {title || "PRICING PLANS"}
               </h1>
-              <p 
+              <p
                 onClick={(e) => handleElementClick(e, 'subtitle', subtitle)}
                 className="text-sm md:text-lg text-slate-200 max-w-2xl font-light"
               >
@@ -4663,13 +4607,12 @@ export default function DynamicSection({
                     const isPopular = plan.isMostPopular;
                     const isLocked = plan.isLocked;
                     return (
-                      <div 
+                      <div
                         key={plan.id || idx}
-                        className={`relative rounded-2xl flex flex-col justify-between transition-all duration-300 border ${
-                          isPopular 
-                            ? 'bg-slate-950 text-white border-amber-400 shadow-2xl scale-105 z-10 w-full md:w-80' 
+                        className={`relative rounded-2xl flex flex-col justify-between transition-all duration-300 border ${isPopular
+                            ? 'bg-slate-950 text-white border-amber-400 shadow-2xl scale-105 z-10 w-full md:w-80'
                             : 'bg-white text-slate-900 border-slate-200 shadow hover:border-blue-300 hover:shadow-lg w-full md:w-64'
-                        } ${isLocked ? 'opacity-55 saturate-50 contrast-75' : ''}`}
+                          } ${isLocked ? 'opacity-55 saturate-50 contrast-75' : ''}`}
                       >
                         {isPopular && (
                           <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 font-black text-[10px] tracking-widest uppercase px-4 py-1 rounded-full shadow-lg z-20">
@@ -4696,7 +4639,7 @@ export default function DynamicSection({
 
                           {/* Buy/Pay Button is placed immediately under the pricing */}
                           <div className="py-2">
-                            <button 
+                            <button
                               onClick={() => {
                                 if (isLocked) {
                                   alert("Its locked for future");
@@ -4707,13 +4650,12 @@ export default function DynamicSection({
                                 setCheckoutEmail('');
                                 setCheckoutPhone('');
                               }}
-                              className={`w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all hover:scale-[1.02] flex items-center justify-center gap-2 ${
-                                isLocked
+                              className={`w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all hover:scale-[1.02] flex items-center justify-center gap-2 ${isLocked
                                   ? 'bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-450 cursor-pointer border border-dashed border-slate-450'
-                                  : isPopular 
-                                    ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-md shadow-amber-500/20' 
+                                  : isPopular
+                                    ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-md shadow-amber-500/20'
                                     : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/10'
-                              }`}
+                                }`}
                             >
                               {isLocked ? (
                                 <>
@@ -4815,7 +4757,7 @@ export default function DynamicSection({
                   {subtitle || "Take our 30-second rapid pathway quiz to evaluate your preparation levels and get recommended matching bootcamps."}
                 </p>
                 <div className="mt-2 flex items-center gap-3">
-                  <button 
+                  <button
                     onClick={() => {
                       setAssessmentStep(0);
                       setAssessmentAnswers({});
@@ -4830,8 +4772,8 @@ export default function DynamicSection({
               </div>
 
               <div className="w-full max-w-[280px] md:max-w-xs shrink-0 rounded-xl overflow-hidden shadow-2xl border border-slate-800">
-                <img 
-                  src={content.bannerImage || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800"} 
+                <img
+                  src={content.bannerImage || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800"}
                   alt="Assessment Banner"
                   className="w-full h-44 md:h-52 object-cover"
                 />
@@ -4845,7 +4787,7 @@ export default function DynamicSection({
           <div className="w-full py-6 flex flex-col gap-6 items-center text-[#071B4D]">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 w-full max-w-5xl">
               {(content.stats || []).map((st: any, sIdx: number) => (
-                <div 
+                <div
                   key={st.id || sIdx}
                   className="bg-slate-50 border border-slate-100 p-6 rounded-2xl text-center shadow-sm hover:shadow transition-shadow flex flex-col gap-1 items-center"
                 >
@@ -4870,7 +4812,7 @@ export default function DynamicSection({
               onClick={() => setCheckoutPlan(null)}
               className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm"
             />
-            
+
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -4879,7 +4821,7 @@ export default function DynamicSection({
             >
               {/* Header */}
               <div className="bg-[#071B4D] text-white p-6 relative">
-                <button 
+                <button
                   onClick={() => setCheckoutPlan(null)}
                   className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors"
                 >
@@ -4895,11 +4837,11 @@ export default function DynamicSection({
               </div>
 
               {/* Form body */}
-              <form 
+              <form
                 onSubmit={async (e) => {
                   e.preventDefault();
                   setCheckoutError(null);
-                  
+
                   try {
                     const amount = Number(checkoutPlan.price || 0);
                     const orderRes = await fetch('/api/razorpay/create-order', {
@@ -4912,7 +4854,7 @@ export default function DynamicSection({
                         notes: { type: 'plan', planName: checkoutPlan.name }
                       })
                     });
-                    
+
                     let orderData = { keyId: razorpayKeyId, order: { id: null } };
                     if (orderRes.ok) {
                       try {
@@ -4927,7 +4869,7 @@ export default function DynamicSection({
                     if (!orderData?.keyId || !orderData?.order?.id) {
                       throw new Error("Razorpay is not configured correctly. Please verify the live API keys.");
                     }
-                    
+
                     const loaded = await loadRazorpayScript();
                     if (!loaded || !(window as any).Razorpay) {
                       throw new Error("Razorpay script could not be loaded.");
@@ -5024,8 +4966,8 @@ export default function DynamicSection({
 
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-slate-500 uppercase tracking-wider text-[9px]">Full Name</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     value={checkoutName}
                     onChange={(e) => setCheckoutName(e.target.value)}
@@ -5036,8 +4978,8 @@ export default function DynamicSection({
 
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-slate-500 uppercase tracking-wider text-[9px]">Email Address</label>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     required
                     value={checkoutEmail}
                     onChange={(e) => setCheckoutEmail(e.target.value)}
@@ -5048,8 +4990,8 @@ export default function DynamicSection({
 
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-slate-500 uppercase tracking-wider text-[9px]">Phone Number</label>
-                  <input 
-                    type="tel" 
+                  <input
+                    type="tel"
                     required
                     value={checkoutPhone}
                     onChange={(e) => setCheckoutPhone(e.target.value)}
@@ -5063,7 +5005,7 @@ export default function DynamicSection({
                   <span>Razorpay secure encryption active.</span>
                 </div>
 
-                <button 
+                <button
                   type="submit"
                   className="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider rounded-xl shadow-lg transition-transform hover:scale-[1.01]"
                 >
@@ -5086,7 +5028,7 @@ export default function DynamicSection({
               onClick={() => setPaymentSuccessReceipt(null)}
               className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm"
             />
-            
+
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -5154,7 +5096,7 @@ export default function DynamicSection({
                 </div>
 
                 <div className="flex mt-2">
-                  <button 
+                  <button
                     onClick={() => setPaymentSuccessReceipt(null)}
                     className="w-full py-3 bg-[#071B4D] hover:bg-[#071B4D]/90 text-white font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-blue-900/10 text-center"
                   >
@@ -5187,7 +5129,7 @@ export default function DynamicSection({
             >
               {/* Header */}
               <div className="bg-[#071B4D] text-white p-6 relative">
-                <button 
+                <button
                   onClick={() => setAssessmentModalOpen(false)}
                   className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors"
                 >
@@ -5204,7 +5146,7 @@ export default function DynamicSection({
 
               {/* Quiz Steps */}
               <div className="p-6 flex flex-col gap-5 text-xs">
-                
+
                 {/* Question 1 */}
                 {assessmentStep === 0 && (
                   <div className="flex flex-col gap-4">
@@ -5292,7 +5234,7 @@ export default function DynamicSection({
                       <Icons.TrendingUp className="h-5 w-5" />
                     </div>
                     <h4 className="font-display font-black text-base text-[#071B4D] uppercase">Your Career Path Analysis</h4>
-                    
+
                     <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
                       <p className="font-bold text-[#071B4D] mb-1">RECOMMENDATION: CAREER PRO PLAN</p>
                       Based on your goals and beginner/intermediate status, we recommend starting immediately with the complete three-month Career Pro bootcamp. Includes complete ATS Resume optimization, unlimited mock runs, and premium direct placement access.
@@ -5355,7 +5297,7 @@ export default function DynamicSection({
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
-                
+
                 {/* Close button inside image header */}
                 <button
                   onClick={() => setActiveReaderBlog(null)}

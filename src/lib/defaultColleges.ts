@@ -157,8 +157,8 @@ export const DEFAULT_COLLEGES_SECTIONS: CMSSection[] = [
       ],
       contact: {
         deskTitle: 'Institutional Support Desk',
-        email: 'partnerships@tantrapex.com',
-        phone: '+91 (080) 4128-9900',
+        email: 'Contact@tantrapex.com',
+        phone: '+91 93023 70048',
         timing: 'Mon – Fri: 09:30 AM – 06:30 PM IST'
       },
       form: {

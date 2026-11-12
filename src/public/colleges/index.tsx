@@ -154,7 +154,7 @@ export default function PublicCollegePartnershipPage({
       {/* 1. TOP BREADCRUMB & EXECUTIVE HEADER SECTION */}
       <section className="w-full bg-[#f2f4f8] py-12 lg:py-16 border-b border-[#e0e2e6]">
         <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
-          
+
           {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="flex items-center gap-2 mb-6 text-xs font-semibold text-[#5f5e5e]">
             <a href="#/" className="hover:text-[#191c1f] transition-colors">
@@ -216,7 +216,7 @@ export default function PublicCollegePartnershipPage({
       {/* 2. PURPOSE & CORE INSTITUTIONAL BENEFITS (3 HIGH-IMPACT CARDS) */}
       <section className="w-full bg-[#f7f9fd] py-16 lg:py-24 border-b border-[#e0e2e6]">
         <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
-          
+
           <div className="flex flex-col gap-2 mb-12">
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#2e6c00] font-mono">
               {benefitsContent.eyebrow || 'CORE INSTITUTIONAL VALUE'}
@@ -267,7 +267,7 @@ export default function PublicCollegePartnershipPage({
       {/* 3. HOW THE COLLEGE COLLABORATION WORKS (4-STEP LINEAR WORKFLOW) */}
       <section className="w-full bg-[#f2f4f8] py-16 lg:py-24 border-b border-[#e0e2e6]">
         <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
-          
+
           <div className="flex flex-col items-center text-center max-w-2xl mx-auto mb-16">
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#2e6c00] font-mono">
               {processContent.eyebrow || 'INSTITUTIONAL ROADMAP'}
@@ -288,27 +288,24 @@ export default function PublicCollegePartnershipPage({
               return (
                 <div
                   key={idx}
-                  className={`p-6 rounded-2xl flex flex-col justify-between border transition-all ${
-                    isHighlight
-                      ? 'bg-white border-[#80d64b] shadow-sm'
-                      : 'bg-white border-[#e0e2e6] hover:shadow-xs'
-                  }`}
+                  className={`p-6 rounded-2xl flex flex-col justify-between border transition-all ${isHighlight
+                    ? 'bg-white border-[#80d64b] shadow-sm'
+                    : 'bg-white border-[#e0e2e6] hover:shadow-xs'
+                    }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-6">
                       <span
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-display font-extrabold text-sm ${
-                          isHighlight
-                            ? 'bg-[#80d64b] text-[#092100]'
-                            : 'bg-[#191c1f] text-white'
-                        }`}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-display font-extrabold text-sm ${isHighlight
+                          ? 'bg-[#80d64b] text-[#092100]'
+                          : 'bg-[#191c1f] text-white'
+                          }`}
                       >
                         {step.stepNumber || idx + 1}
                       </span>
                       <IconComponent
-                        className={`h-5 w-5 ${
-                          isHighlight ? 'text-[#2e6c00]' : 'text-[#5f5e5e]'
-                        }`}
+                        className={`h-5 w-5 ${isHighlight ? 'text-[#2e6c00]' : 'text-[#5f5e5e]'
+                          }`}
                       />
                     </div>
 
@@ -336,9 +333,9 @@ export default function PublicCollegePartnershipPage({
       {/* 4. COLLEGE / INSTITUTION ENQUIRY FORM (2-COLUMN SECTION) */}
       <section className="w-full bg-[#f7f9fd] py-16 lg:py-24 border-b border-[#e0e2e6]" id="enquiry-section">
         <div className="max-w-[1360px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-            
+
             {/* Left Side: Summary & Institutional Support Desk */}
             <div className="lg:col-span-5 flex flex-col gap-6">
               <div>
@@ -388,16 +385,16 @@ export default function PublicCollegePartnershipPage({
                   <div className="flex items-center gap-3">
                     <Mail className="h-4 w-4 text-[#191c1f]" />
                     <a
-                      href={`mailto:${contactInfo.email || 'partnerships@tantrapex.com'}`}
+                      href={`mailto:${contactInfo.email || 'Contact@tantrapex.com'}`}
                       className="text-[#191c1f] font-semibold hover:text-[#2e6c00] transition-colors"
                     >
-                      {contactInfo.email || 'partnerships@tantrapex.com'}
+                      {contactInfo.email || 'Contact@tantrapex.com'}
                     </a>
                   </div>
                   <div className="flex items-center gap-3">
                     <Phone className="h-4 w-4 text-[#191c1f]" />
                     <span className="text-[#191c1f] font-semibold">
-                      {contactInfo.phone || '+91 (080) 4128-9900'}
+                      {contactInfo.phone || '+91 93023 70048'}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">

@@ -14,6 +14,14 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   exploreMoreTitle: "Explore More",
   exploreMoreItems: [
     {
+      id: "exp-free-register",
+      label: "Register for Free Drives",
+      desc: "100% Free candidate placement registration desk",
+      link: "#/register-for-free",
+      iconName: "UserCheck",
+      isVisible: true
+    },
+    {
       id: "exp-ambassador",
       label: "Campus Ambassador",
       desc: "Student campus leadership & recruitment program",
@@ -99,6 +107,7 @@ export const DEFAULT_FOOTER_CONFIG: FooterConfig = {
       id: "col-placements",
       title: "Placement Quick Links",
       links: [
+        { id: "pl-0", label: "Register for Free Drives", link: "#/register-for-free" },
         { id: "pl-1", label: "Upcoming Campus Drives", link: "#/upcoming-drives" },
         { id: "pl-2", label: "Placement Partners", link: "#/companies" },
         { id: "pl-3", label: "Programs & Pricing", link: "#/pricing" },

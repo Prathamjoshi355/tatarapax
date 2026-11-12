@@ -25,34 +25,81 @@ export default function AdminHomePage({
   setMedia
 }: AdminHomePageProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(page.sections[0]?.id || null);
-  const [seoTitle, setSeoTitle] = useState(page.seo.title);
-  const [seoDesc, setSeoDesc] = useState(page.seo.description);
-  const [seoKeywords, setSeoKeywords] = useState(page.seo.keywords);
+  const [seoTitle, setSeoTitle] = useState(page.seo?.title || '');
+  const [seoDesc, setSeoDesc] = useState(page.seo?.description || '');
+  const [seoKeywords, setSeoKeywords] = useState(page.seo?.keywords || '');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  const [isSaving, setIsSaving] = useState(false);
 
   const activeSection = page.sections.find(s => s.id === activeSectionId);
 
-  const handleSaveSEO = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPages(prev => prev.map(p => {
-      if (p.id !== page.id) return p;
-      return {
-        ...p,
+  const handleSaveToDatabase = async () => {
+    setIsSaving(true);
+    triggerSaveNotification("Saving Homepage to MongoDB Atlas...");
+    try {
+      const updatedPage: CMSPage = {
+        ...page,
         seo: {
           title: seoTitle,
           description: seoDesc,
           keywords: seoKeywords
         }
       };
-    }));
-    triggerSaveNotification("SEO Settings updated successfully!");
+
+      const res = await fetch('/api/save-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: updatedPage })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (data.success !== false) {
+        triggerSaveNotification("Homepage saved directly to MongoDB Atlas!");
+      } else {
+        triggerSaveNotification(data.msg || "Saved locally. Syncing...");
+      }
+    } catch {
+      triggerSaveNotification("Saved to local draft.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveSEO = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatedPage: CMSPage = {
+      ...page,
+      seo: {
+        title: seoTitle,
+        description: seoDesc,
+        keywords: seoKeywords
+      }
+    };
+    setPages(prev => prev.map(p => p.id === page.id ? updatedPage : p));
+    triggerSaveNotification("Saving SEO to MongoDB Atlas...");
+    try {
+      const res = await fetch('/api/save-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: updatedPage })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success !== false) {
+        triggerSaveNotification("SEO Settings saved directly to MongoDB Atlas!");
+      } else {
+        triggerSaveNotification("SEO updated locally.");
+      }
+    } catch {
+      triggerSaveNotification("SEO updated locally.");
+    }
   };
 
   const triggerSaveNotification = (msg: string) => {
     setSaveStatus(msg);
     setTimeout(() => {
       setSaveStatus(null);
-    }, 2500);
+    }, 3500);
   };
 
   return (
@@ -73,12 +120,27 @@ export default function AdminHomePage({
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleSaveToDatabase}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white font-bold rounded-lg text-xs transition-colors shadow cursor-pointer active:scale-95"
+              title="Save entire homepage state directly to MongoDB Atlas"
+            >
+              {isSaving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              <span>Save to MongoDB Atlas</span>
+            </button>
             <span className="text-[10px] font-mono text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-900 px-2.5 py-1 rounded-md flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-ping" />
               <span>MongoDB Atlas Connected</span>
             </span>
           </div>
         </div>
+
+        {saveStatus && (
+          <div className="px-4 py-3 bg-emerald-950/70 border border-emerald-800 text-emerald-300 text-xs font-semibold rounded-xl flex items-center gap-2">
+            <span>{saveStatus}</span>
+          </div>
+        )}
 
         {/* Global SEO Panel */}
         <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl">

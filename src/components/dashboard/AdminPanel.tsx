@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { 
   CMSPage, CMSSection, GlobalSettings, MediaItem, BlogPost, PlacedStudent, HiringPartner, Course, Lead, Service,
-  PlacementDrive, PlacementApplication, DriveFormField, DEFAULT_DRIVE_FORM_FIELDS, DriveFormFieldType
+  PlacementDrive, PlacementApplication, DriveFormField, DEFAULT_DRIVE_FORM_FIELDS, DriveFormFieldType,
+  FreeCandidateRegistration, WorkshopItem
 } from '../../types';
+import { 
+  PREDEFINED_DOMAINS, 
+  STANDARDIZED_SALARY_BANDS, 
+  matchesDriveDomain,
+  generateDriveSlug,
+  getDriveSlug,
+  getDriveShareUrl
+} from '../../lib/defaultDrives';
+import { isWorkshopPast } from '../../lib/workshopUtils';
 import { UniversalImageUploader, UniversalImageUploaderLight, UniversalMultiImageUploader } from './UniversalImageUploader';
 import { 
   LayoutDashboard, FileText, Users, Award, BookOpen, Newspaper, FormInput, Image, Settings, Briefcase,
   TrendingUp, HelpCircle, CheckCircle, Clock, Trash2, Plus, Edit, Download, Check, RefreshCw, X, LogOut,
   GraduationCap, Megaphone, Calendar, Ticket, Mail, CreditCard, User, Building2, Lock,
-  CheckSquare, FileUp, Sliders, AlertCircle as AlertCircleIcon
+  CheckSquare, FileUp, Sliders, AlertCircle as AlertCircleIcon, Save,
+  UserCheck, FileSpreadsheet, Eye, Search, PhoneCall, Camera, Link2, Copy, ExternalLink
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -122,6 +133,7 @@ export default function AdminPanel({
     companyName: '',
     companyLogo: '',
     title: '',
+    slug: '',
     description: '',
     driveType: 'off-campus',
     formFields: DEFAULT_DRIVE_FORM_FIELDS,
@@ -136,7 +148,13 @@ export default function AdminPanel({
     openingDate: '',
     deadline: '',
     selectionProcess: 'Online Test + Tech Interview + HR Round',
-    status: 'published'
+    status: 'published',
+    googleFormUrl: '',
+    whatsappGroupUrl: '',
+    applyMode: 'internal',
+    domain: '',
+    domainLabel: '',
+    salaryBand: ''
   });
   const [homeSaveStatus, setHomeSaveStatus] = useState<string | null>(null);
   const [isSavingHome, setIsSavingHome] = useState(false);
@@ -158,12 +176,26 @@ export default function AdminPanel({
   const [newFieldOptionsStr, setNewFieldOptionsStr] = useState('');
   const [driveFilterStatus, setDriveFilterStatus] = useState('all');
   const [driveFilterType, setDriveFilterType] = useState('all');
+  const [driveFilterDomain, setDriveFilterDomain] = useState('all');
   const [driveSearchQuery, setDriveSearchQuery] = useState('');
   const [viewingDriveApplicantsModal, setViewingDriveApplicantsModal] = useState<PlacementDrive | null>(null);
   const [driveApplicantsList, setDriveApplicantsList] = useState<PlacementApplication[]>([]);
   const [loadingDriveApplicants, setLoadingDriveApplicants] = useState(false);
   const [driveApplicantSearch, setDriveApplicantSearch] = useState('');
   const [selectedCandidateDetail, setSelectedCandidateDetail] = useState<PlacementApplication | null>(null);
+  const [driveApplicantCounts, setDriveApplicantCounts] = useState<Record<string, number>>({});
+
+  const fetchDriveApplicantCounts = async () => {
+    try {
+      const res = await fetch('/api/placement-applications/counts');
+      const data = await res.json();
+      if (data.success && data.counts) {
+        setDriveApplicantCounts(prev => ({ ...prev, ...data.counts }));
+      }
+    } catch (err) {
+      console.warn("Could not load drive applicant counts:", err);
+    }
+  };
 
   const fetchPlacementDrives = async () => {
     try {
@@ -171,14 +203,23 @@ export default function AdminPanel({
       const data = await res.json();
       if (data.success && Array.isArray(data.drives)) {
         setPlacementDrives(data.drives);
+        const map: Record<string, number> = {};
+        data.drives.forEach((d: any) => {
+          if (typeof d.applicantCount === 'number') {
+            map[d.id] = d.applicantCount;
+          }
+        });
+        setDriveApplicantCounts(prev => ({ ...prev, ...map }));
       }
     } catch (err) {
       console.error("Error fetching drives:", err);
     }
+    fetchDriveApplicantCounts();
   };
 
   useEffect(() => {
     fetchPlacementDrives();
+    fetchDriveApplicantCounts();
   }, []);
 
   const fetchCompanyApplications = async (companyId: string) => {
@@ -205,6 +246,7 @@ export default function AdminPanel({
       const data = await res.json();
       if (data.success && Array.isArray(data.applications)) {
         setDriveApplicantsList(data.applications);
+        setDriveApplicantCounts(prev => ({ ...prev, [driveId]: data.applications.length }));
       } else {
         setDriveApplicantsList([]);
       }
@@ -256,17 +298,154 @@ export default function AdminPanel({
     }
   };
 
+  // Dedicated Free Candidate Registrations State & Handlers
+  const [freeRegistrations, setFreeRegistrations] = useState<FreeCandidateRegistration[]>([]);
+  const [loadingFreeRegs, setLoadingFreeRegs] = useState<boolean>(false);
+  const [searchFreeRegs, setSearchFreeRegs] = useState<string>('');
+  const [freeRegStatusFilter, setFreeRegStatusFilter] = useState<string>('all');
+  const [selectedCandidateModal, setSelectedCandidateModal] = useState<FreeCandidateRegistration | null>(null);
+
+  const fetchFreeRegistrations = async () => {
+    setLoadingFreeRegs(true);
+    try {
+      const res = await fetch('/api/free-registrations');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.registrations)) {
+        setFreeRegistrations(data.registrations);
+        localStorage.setItem('tpx_free_candidate_registrations', JSON.stringify(data.registrations));
+      } else {
+        const local = JSON.parse(localStorage.getItem('tpx_free_candidate_registrations') || '[]');
+        setFreeRegistrations(local);
+      }
+    } catch {
+      const local = JSON.parse(localStorage.getItem('tpx_free_candidate_registrations') || '[]');
+      setFreeRegistrations(local);
+    } finally {
+      setLoadingFreeRegs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFreeRegistrations();
+  }, []);
+
+  const handleUpdateFreeRegStatus = async (id: string, newStatus: 'New' | 'Contacted' | 'Reviewed' | 'Archived') => {
+    try {
+      await fetch(`/api/free-registrations/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      setFreeRegistrations(prev => prev.map(r => (r.id === id || r._id === id) ? { ...r, status: newStatus } : r));
+      if (selectedCandidateModal && (selectedCandidateModal.id === id || selectedCandidateModal._id === id)) {
+        setSelectedCandidateModal({ ...selectedCandidateModal, status: newStatus });
+      }
+      const updated = freeRegistrations.map(r => (r.id === id || r._id === id) ? { ...r, status: newStatus } : r);
+      localStorage.setItem('tpx_free_candidate_registrations', JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to update status:", e);
+    }
+  };
+
+  const handleDeleteFreeReg = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this candidate registration?")) return;
+    try {
+      await fetch(`/api/free-registrations/${id}`, { method: 'DELETE' });
+      setFreeRegistrations(prev => prev.filter(r => r.id !== id && r._id !== id));
+      const updated = freeRegistrations.filter(r => r.id !== id && r._id !== id);
+      localStorage.setItem('tpx_free_candidate_registrations', JSON.stringify(updated));
+      if (selectedCandidateModal && (selectedCandidateModal.id === id || selectedCandidateModal._id === id)) {
+        setSelectedCandidateModal(null);
+      }
+    } catch (e) {
+      console.error("Failed to delete candidate registration:", e);
+    }
+  };
+
+  const filteredFreeRegs = freeRegistrations.filter(r => {
+    const matchesStatus = freeRegStatusFilter === 'all' || (r.status || 'New').toLowerCase() === freeRegStatusFilter.toLowerCase();
+    const q = searchFreeRegs.toLowerCase().trim();
+    const matchesSearch = !q || 
+      (r.name && r.name.toLowerCase().includes(q)) ||
+      (r.email && r.email.toLowerCase().includes(q)) ||
+      (r.phone && r.phone.toLowerCase().includes(q)) ||
+      (r.degree && r.degree.toLowerCase().includes(q)) ||
+      (r.batch && r.batch.toLowerCase().includes(q)) ||
+      (r.description && r.description.toLowerCase().includes(q)) ||
+      (r.instruction && r.instruction.toLowerCase().includes(q));
+    return matchesStatus && matchesSearch;
+  });
+
+  const handleExportFreeRegsCSV = () => {
+    const recordsToExport = filteredFreeRegs;
+    if (recordsToExport.length === 0) {
+      alert("No candidate records to export.");
+      return;
+    }
+
+    const headers = [
+      "Candidate ID",
+      "Full Name",
+      "Phone / WhatsApp",
+      "Email Address",
+      "Degree / Qualification",
+      "Graduation Batch",
+      "Candidate Description / Summary",
+      "Special Instructions / Target Roles",
+      "Status",
+      "Source",
+      "Registration Date"
+    ];
+
+    const escapeCsv = (str: any) => {
+      if (str === null || str === undefined) return '""';
+      const clean = String(str).replace(/"/g, '""');
+      return `"${clean}"`;
+    };
+
+    const rows = recordsToExport.map(r => [
+      escapeCsv(r.id || r._id || ""),
+      escapeCsv(r.name || ""),
+      escapeCsv(r.phone || ""),
+      escapeCsv(r.email || ""),
+      escapeCsv(r.degree || ""),
+      escapeCsv(r.batch || ""),
+      escapeCsv(r.description || ""),
+      escapeCsv(r.instruction || ""),
+      escapeCsv(r.status || "New"),
+      escapeCsv(r.source || "Homepage Free Registration"),
+      escapeCsv(r.createdAt ? new Date(r.createdAt).toLocaleString("en-IN") : "")
+    ].join(","));
+
+    const csvString = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `TantraPex_Free_Candidates_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportFreeRegsExcel = () => {
+    window.open('/api/free-registrations/export-excel', '_blank');
+  };
+
   // Workshop Form State Holders
   const [selectedWorkshop, setSelectedWorkshop] = useState<any | null>(null);
+  const [selectedWorkshopForPhotos, setSelectedWorkshopForPhotos] = useState<WorkshopItem | null>(null);
   const [workshopForm, setWorkshopForm] = useState<any>({
     title: '',
     desc: '',
     date: '',
     location: '',
-    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=500',
+    image: '',
     status: 'upcoming',
     isFree: true,
-    price: 0
+    price: 0,
+    images: []
   });
 
   // Workshop Gallery State
@@ -340,6 +519,52 @@ export default function AdminPanel({
   const [regWorkshopFilter, setRegWorkshopFilter] = useState('all');
   const [selectedRegForTicket, setSelectedRegForTicket] = useState<any | null>(null);
   const [regToast, setRegToast] = useState<string | null>(null);
+  const [dbSyncToast, setDbSyncToast] = useState<{ message: string; type: 'success' | 'error' | 'loading' } | null>(null);
+
+  const triggerDbToast = (message: string, type: 'success' | 'error' | 'loading' = 'success') => {
+    setDbSyncToast({ message, type });
+    if (type !== 'loading') {
+      setTimeout(() => setDbSyncToast(null), 3500);
+    }
+  };
+
+  const savePageToDatabase = async (pageToSave: CMSPage) => {
+    try {
+      triggerDbToast(`Saving "${pageToSave.title || pageToSave.id}" to MongoDB database...`, 'loading');
+      const res = await fetch('/api/save-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: pageToSave })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success !== false) {
+        triggerDbToast(`Saved "${pageToSave.title || pageToSave.id}" to MongoDB Atlas!`, 'success');
+      } else {
+        triggerDbToast(`Saved in local state. Database sync: ${data.msg || 'Pending'}`, 'error');
+      }
+    } catch (err: any) {
+      triggerDbToast(`Saved locally. Network error: ${err.message}`, 'error');
+    }
+  };
+
+  const saveCollectionToDatabase = async (collectionKey: string, data: any, friendlyName: string) => {
+    try {
+      triggerDbToast(`Saving ${friendlyName} to MongoDB database...`, 'loading');
+      const res = await fetch('/api/save-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [collectionKey]: data })
+      });
+      const resJson = await res.json().catch(() => ({}));
+      if (resJson.success !== false) {
+        triggerDbToast(`Successfully saved ${friendlyName} to MongoDB Atlas!`, 'success');
+      } else {
+        triggerDbToast(`Saved in local state. Database sync: ${resJson.msg || 'Pending'}`, 'error');
+      }
+    } catch (err: any) {
+      triggerDbToast(`Saved locally. Network error: ${err.message}`, 'error');
+    }
+  };
 
   // CSV Exporter Simulation
   const handleExportCSV = (type: string) => {
@@ -421,24 +646,10 @@ export default function AdminPanel({
   // Plan Purchases loaders
   const getPlanPurchases = () => {
     const raw = localStorage.getItem('tpx_plan_purchases');
-    if (!raw) {
-      const mockPurchases = [
-        {
-          paymentId: "pay_TESTPLN101",
-          orderId: "order_TESTORD101",
-          date: "5 July 2026, 11:30 am",
-          planName: "Super Premium Plan",
-          amount: 2999,
-          studentName: "Pratham Joshi",
-          studentEmail: "prathamjoshi355@gmail.com",
-          studentPhone: "9876543210"
-        }
-      ];
-      localStorage.setItem('tpx_plan_purchases', JSON.stringify(mockPurchases));
-      return mockPurchases;
-    }
+    if (!raw) return [];
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter(p => !p.paymentId?.startsWith('pay_TESTPLN')) : [];
     } catch (e) {
       return [];
     }
@@ -446,32 +657,10 @@ export default function AdminPanel({
 
   const getEmailLogs = () => {
     const raw = localStorage.getItem('tpx_sent_emails');
-    if (!raw) {
-      const mockEmails = [
-        {
-          id: "mail-1",
-          recipientName: "Pratham Joshi",
-          recipientEmail: "prathamjoshi355@gmail.com",
-          subject: "Your Tantrapex Workshop Admit Card - Resume Building Workshop",
-          timestamp: "2026-07-05T08:12:35-07:00",
-          status: "Delivered",
-          bodyPreview: "Dear Pratham, Your registration for Resume Building Workshop is successful. Find your entrance admit card attached..."
-        },
-        {
-          id: "mail-2",
-          recipientName: "Rohan Sharma",
-          recipientEmail: "rohan.sharma@gmail.com",
-          subject: "Your Tantrapex Workshop Admit Card & Receipt - Interview Preparation Workshop",
-          timestamp: "2026-07-04T14:45:02-07:00",
-          status: "Delivered",
-          bodyPreview: "Dear Rohan, Thank you for registering. We have successfully processed your payment of Rs 199. Your Admit Card is attached..."
-        }
-      ];
-      localStorage.setItem('tpx_sent_emails', JSON.stringify(mockEmails));
-      return mockEmails;
-    }
+    if (!raw) return [];
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter(m => m.id !== 'mail-1' && m.id !== 'mail-2') : [];
     } catch (e) {
       return [];
     }
@@ -548,6 +737,7 @@ export default function AdminPanel({
               { id: 'services', label: 'Services Catalog', icon: Briefcase },
               { id: 'blogs', label: 'Blog Articles CMS', icon: Newspaper },
               { id: 'leads', label: 'Form Leads submissions', icon: FormInput },
+              { id: 'free-registrations', label: 'Free Candidate Registrations', icon: UserCheck },
               { id: 'workshops-cms', label: 'Workshops Manager', icon: Calendar },
               { id: 'workshop-registrations', label: 'Workshop Registrations', icon: Ticket },
               { id: 'plan-purchases', label: 'Plan Purchases CRM', icon: CreditCard },
@@ -568,7 +758,12 @@ export default function AdminPanel({
                   }`}
                 >
                   <TabIcon className="h-4 w-4 shrink-0" />
-                  <span>{tab.label}</span>
+                  <span className="flex-1">{tab.label}</span>
+                  {tab.id === 'free-registrations' && freeRegistrations.length > 0 && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {freeRegistrations.length}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1386,61 +1581,83 @@ export default function AdminPanel({
         {/* TAB 2: PAGES MANAGER & SEO */}
         {activeTab === 'pages' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans">
-            <div>
-              <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Pages & SEO Search Optimization</h1>
-              <p className="text-slate-500">Edit page titles, URL slugs, and search robot meta properties for all 12 modules.</p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Pages & SEO Search Optimization</h1>
+                <p className="text-slate-500">Edit page titles, URL slugs, and search robot meta properties for all 12 modules directly on MongoDB Atlas.</p>
+              </div>
+              <button
+                onClick={() => saveCollectionToDatabase('pages', pages, 'Pages & SEO Metadata')}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                title="Explicitly save and sync all pages & SEO to MongoDB Atlas"
+              >
+                <Save className="h-4 w-4" />
+                <span>Save All Pages & SEO to MongoDB Atlas</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {pages.map((p, pi) => (
-                <div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="font-display font-bold text-base text-slate-900 uppercase">{p.title} Page</h3>
-                    <span className="font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded text-[10px]">{p.slug}</span>
+                <div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between gap-4">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="font-display font-bold text-base text-slate-900 uppercase">{p.title} Page</h3>
+                      <span className="font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded text-[10px]">{p.slug}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-3 mt-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-600 uppercase tracking-wide text-[9px]">Meta Header Title</label>
+                        <input 
+                          type="text" 
+                          value={p.seo.title}
+                          onChange={(e) => {
+                            const updated = [...pages];
+                            updated[pi].seo.title = e.target.value;
+                            setPages(updated);
+                          }}
+                          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-600 uppercase tracking-wide text-[9px]">Meta Description</label>
+                        <textarea 
+                          rows={2}
+                          value={p.seo.description}
+                          onChange={(e) => {
+                            const updated = [...pages];
+                            updated[pi].seo.description = e.target.value;
+                            setPages(updated);
+                          }}
+                          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-600 uppercase tracking-wide text-[9px]">Keywords (Comma split)</label>
+                        <input 
+                          type="text" 
+                          value={p.seo.keywords}
+                          onChange={(e) => {
+                            const updated = [...pages];
+                            updated[pi].seo.keywords = e.target.value;
+                            setPages(updated);
+                          }}
+                          className="px-3 py-2 bg-slate-50 border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-1">
-                      <label className="font-bold text-slate-600 uppercase tracking-wide text-[9px]">Meta Header Title</label>
-                      <input 
-                        type="text" 
-                        value={p.seo.title}
-                        onChange={(e) => {
-                          const updated = [...pages];
-                          updated[pi].seo.title = e.target.value;
-                          setPages(updated);
-                        }}
-                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <label className="font-bold text-slate-600 uppercase tracking-wide text-[9px]">Meta Description</label>
-                      <textarea 
-                        rows={2}
-                        value={p.seo.description}
-                        onChange={(e) => {
-                          const updated = [...pages];
-                          updated[pi].seo.description = e.target.value;
-                          setPages(updated);
-                        }}
-                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <label className="font-bold text-slate-600 uppercase tracking-wide text-[9px]">Keywords (Comma split)</label>
-                      <input 
-                        type="text" 
-                        value={p.seo.keywords}
-                        onChange={(e) => {
-                          const updated = [...pages];
-                          updated[pi].seo.keywords = e.target.value;
-                          setPages(updated);
-                        }}
-                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
+                  <div className="flex justify-end pt-3 border-t border-slate-100">
+                    <button
+                      onClick={() => savePageToDatabase(p)}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      <span>Save This Page</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1454,18 +1671,28 @@ export default function AdminPanel({
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase font-mono">Placed Students Pool CRM</h1>
-                <p className="text-slate-500">Add, edit, or delete student placements, college branches, and hiring packages.</p>
+                <p className="text-slate-500">Add, edit, or delete student placements, college branches, and hiring packages directly on MongoDB Atlas.</p>
               </div>
-              <button 
-                onClick={() => {
-                  setSelectedStudent({ id: `stud-${Date.now()}`, name: '', avatar: '', college: '', branch: '', year: '2024', company: '', packageLpa: '', showOnHomepage: true });
-                  setStudentForm({ name: '', avatar: '', college: '', branch: '', year: '2024', company: '', packageLpa: '', showOnHomepage: true });
-                }}
-                className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add New Student Placement</span>
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button 
+                  onClick={() => saveCollectionToDatabase('placed_students', placedStudents, 'Placed Students Pool')}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                  title="Explicitly save and sync all placed students to MongoDB Atlas"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save to MongoDB Atlas</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setSelectedStudent({ id: `stud-${Date.now()}`, name: '', avatar: '', college: '', branch: '', year: '2024', company: '', packageLpa: '', showOnHomepage: true });
+                    setStudentForm({ name: '', avatar: '', college: '', branch: '', year: '2024', company: '', packageLpa: '', showOnHomepage: true });
+                  }}
+                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow cursor-pointer text-xs"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add New Student Placement</span>
+                </button>
+              </div>
             </div>
 
             {/* Editing / Creating Popup state panel */}
@@ -1567,20 +1794,20 @@ export default function AdminPanel({
                   <button 
                     onClick={() => {
                       const exist = placedStudents.some(s => s.id === selectedStudent.id);
-                      if (exist) {
-                        setPlacedStudents(placedStudents.map(s => s.id === selectedStudent.id ? { ...s, ...studentForm } : s));
-                      } else {
-                        setPlacedStudents([...placedStudents, { id: selectedStudent.id, ...studentForm }]);
-                      }
+                      const updated = exist
+                        ? placedStudents.map(s => s.id === selectedStudent.id ? { ...s, ...studentForm } : s)
+                        : [...placedStudents, { id: selectedStudent.id, ...studentForm }];
+                      setPlacedStudents(updated);
                       setSelectedStudent(null);
+                      saveCollectionToDatabase('placed_students', updated, 'Student Record');
                     }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-white font-bold"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded text-white font-bold cursor-pointer"
                   >
                     Save Record
                   </button>
                   <button 
                     onClick={() => setSelectedStudent(null)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400"
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1638,13 +1865,18 @@ export default function AdminPanel({
                                 name: st.name, avatar: st.avatar, college: st.college, branch: st.branch, year: st.year, company: st.company, packageLpa: st.packageLpa, showOnHomepage: st.showOnHomepage !== false
                               });
                             }}
-                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded"
+                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded cursor-pointer"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button 
-                            onClick={() => setPlacedStudents(placedStudents.filter(ps => ps.id !== st.id))}
-                            className="p-1.5 hover:bg-rose-50 text-rose-600 rounded"
+                            onClick={() => {
+                              if (!confirm(`Delete placement record for ${st.name}?`)) return;
+                              const updated = placedStudents.filter(ps => ps.id !== st.id);
+                              setPlacedStudents(updated);
+                              saveCollectionToDatabase('placed_students', updated, 'Student Record');
+                            }}
+                            className="p-1.5 hover:bg-rose-50 text-rose-600 rounded cursor-pointer"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -1661,21 +1893,31 @@ export default function AdminPanel({
         {/* TAB 4: HIRING PARTNERS */}
         {activeTab === 'partners' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Hiring Partners</h1>
-                <p className="text-slate-500">Edit or introduce corporate brand partners, upload logos, and set visibility on the live website.</p>
+                <p className="text-slate-500">Edit or introduce corporate brand partners, upload logos, and set visibility directly on MongoDB Atlas.</p>
               </div>
-              <button 
-                onClick={() => {
-                  setSelectedPartner({ id: `partner-${Date.now()}`, name: '', logoUrl: '', isVisible: true });
-                  setPartnerForm({ name: '', logoUrl: '', isVisible: true });
-                }}
-                className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add New Partner Brand</span>
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button 
+                  onClick={() => saveCollectionToDatabase('hiring_partners', hiringPartners, 'Hiring Partners')}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                  title="Explicitly save and sync all partners to MongoDB Atlas"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save to MongoDB Atlas</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setSelectedPartner({ id: `partner-${Date.now()}`, name: '', logoUrl: '', isVisible: true });
+                    setPartnerForm({ name: '', logoUrl: '', isVisible: true });
+                  }}
+                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow cursor-pointer text-xs"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add New Partner Brand</span>
+                </button>
+              </div>
             </div>
 
             {/* Editing / Managing Partner Panel */}
@@ -1811,14 +2053,14 @@ export default function AdminPanel({
                             return;
                           }
                           const exist = hiringPartners.some(p => p.id === selectedPartner.id);
-                          if (exist) {
-                            setHiringPartners(hiringPartners.map(p => p.id === selectedPartner.id ? { ...p, ...partnerForm } : p));
-                          } else {
-                            setHiringPartners([...hiringPartners, { id: selectedPartner.id, ...partnerForm }]);
-                          }
+                          const updated = exist
+                            ? hiringPartners.map(p => p.id === selectedPartner.id ? { ...p, ...partnerForm } : p)
+                            : [...hiringPartners, { id: selectedPartner.id, ...partnerForm }];
+                          setHiringPartners(updated);
                           setSelectedPartner(null);
+                          saveCollectionToDatabase('hiring_partners', updated, 'Hiring Partner');
                         }}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-white font-bold"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded text-white font-bold cursor-pointer"
                       >
                         Save Company Profile
                       </button>
@@ -2053,10 +2295,12 @@ export default function AdminPanel({
                       <button 
                         onClick={() => {
                           if (confirm(`Are you sure you want to delete ${partner.name}?`)) {
-                            setHiringPartners(hiringPartners.filter(p => p.id !== partner.id));
+                            const updated = hiringPartners.filter(p => p.id !== partner.id);
+                            setHiringPartners(updated);
+                            saveCollectionToDatabase('hiring_partners', updated, 'Hiring Partner');
                           }
                         }}
-                        className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded shadow-sm"
+                        className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded shadow-sm cursor-pointer"
                         title="Delete partner"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -2131,6 +2375,7 @@ export default function AdminPanel({
                       companyName: hiringPartners[0]?.name || '',
                       companyLogo: hiringPartners[0]?.logoUrl || '',
                       title: '',
+                      slug: '',
                       description: '',
                       driveType: 'off-campus',
                       formFields: DEFAULT_DRIVE_FORM_FIELDS.map(f => ({ ...f })),
@@ -2143,9 +2388,14 @@ export default function AdminPanel({
                       experience: 'Fresher',
                       salary: '₹4.5 - ₹6.0 LPA',
                       openingDate: new Date().toISOString().split('T')[0],
-                      deadline: '',
-                      selectionProcess: 'Online Test + Technical Interview + HR Round',
-                      status: 'published'
+                       selectionProcess: 'Online Test + Technical Interview + HR Round',
+                      status: 'published',
+                      googleFormUrl: '',
+                      whatsappGroupUrl: '',
+                      applyMode: 'internal',
+                      domain: '',
+                      domainLabel: '',
+                      salaryBand: ''
                     });
                     setIsDriveModalOpen(true);
                   }}
@@ -2168,6 +2418,18 @@ export default function AdminPanel({
               />
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* Domain Filter Dropdown */}
+                <select
+                  value={driveFilterDomain}
+                  onChange={(e) => setDriveFilterDomain(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="all">All Domains ({placementDrives.length})</option>
+                  {PREDEFINED_DOMAINS.map(d => (
+                    <option key={d.id} value={d.id}>{d.shortLabel}</option>
+                  ))}
+                </select>
+
                 <select
                   value={driveFilterType}
                   onChange={(e) => setDriveFilterType(e.target.value)}
@@ -2204,7 +2466,7 @@ export default function AdminPanel({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {placementDrives
                   .filter(d => {
                     const matchesSearch = !driveSearchQuery || 
@@ -2213,12 +2475,46 @@ export default function AdminPanel({
                       (d.skills && d.skills.toLowerCase().includes(driveSearchQuery.toLowerCase()));
                     const matchesStatus = driveFilterStatus === 'all' || d.status === driveFilterStatus;
                     const matchesType = driveFilterType === 'all' || (d.driveType || 'off-campus') === driveFilterType;
-                    return matchesSearch && matchesStatus && matchesType;
+                    const matchesDomain = driveFilterDomain === 'all' || matchesDriveDomain(d, driveFilterDomain);
+                    return matchesSearch && matchesStatus && matchesType && matchesDomain;
                   })
                   .map(drive => {
+                    const registeredCount = driveApplicantCounts[drive.id] ?? drive.applicantCount ?? 0;
                     return (
                       <div key={drive.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors">
                         <div className="space-y-3">
+                          
+                          {/* Top Registered Persons Count Header Banner */}
+                          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 bg-slate-50/80 -mx-5 -mt-5 px-5 pt-3.5 rounded-t-xl">
+                            <div className="flex items-center gap-1.5">
+                              <span className="flex h-2 w-2 relative">
+                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${registeredCount > 0 ? 'bg-emerald-400' : 'bg-slate-300'}`}></span>
+                                <span className={`relative inline-flex rounded-full h-2 w-2 ${registeredCount > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                              </span>
+                              <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">
+                                Registered Candidates
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewingDriveApplicantsModal(drive);
+                                fetchDriveApplicants(drive.id);
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-xs transition-all cursor-pointer shadow-xs ${
+                                registeredCount > 0
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 hover:scale-105'
+                                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                              }`}
+                              title="Click to view all registered persons for this drive"
+                            >
+                              <Users className="w-3.5 h-3.5" />
+                              <span className="font-mono text-sm font-black">{registeredCount}</span>
+                              <span className="text-[10px] uppercase tracking-tight">{registeredCount === 1 ? 'Registered' : 'Registered'}</span>
+                            </button>
+                          </div>
+
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2.5">
                               {drive.companyLogo ? (
@@ -2235,7 +2531,15 @@ export default function AdminPanel({
                                   {drive.companyName || 'Partner'}
                                 </span>
                                 <h3 className="font-extrabold text-sm text-slate-900 leading-tight">
-                                  {drive.title}
+                                  <a
+                                    href={`#/drive/${getDriveSlug(drive)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="hover:text-blue-600 hover:underline"
+                                    title="Open unique student drive page"
+                                  >
+                                    {drive.title}
+                                  </a>
                                 </h3>
                               </div>
                             </div>
@@ -2303,6 +2607,26 @@ export default function AdminPanel({
                               <span className="font-bold text-rose-600">{drive.deadline || 'Open'}</span>
                             </div>
                           </div>
+
+                          {/* Unique Placement Drive URL Box (Click to hit unique URL) */}
+                          <a
+                            href={`#/drive/${getDriveSlug(drive)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-indigo-50/70 hover:bg-indigo-100/90 border border-indigo-200/80 rounded-lg p-2.5 flex items-center justify-between gap-2 text-indigo-900 transition-all group cursor-pointer"
+                            title="Directly open this drive's unique URL in new tab"
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Link2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                              <span className="font-mono text-[10px] font-semibold truncate group-hover:underline">
+                                #/drive/{getDriveSlug(drive)}
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200 shrink-0 shadow-xs group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                              <span>Open Drive</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </span>
+                          </a>
                         </div>
 
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-1">
@@ -2311,10 +2635,14 @@ export default function AdminPanel({
                               setViewingDriveApplicantsModal(drive);
                               fetchDriveApplicants(drive.id);
                             }}
-                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1"
+                            className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                              registeredCount > 0
+                                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+                            }`}
                           >
                             <Users className="w-3.5 h-3.5" />
-                            <span>Applicants</span>
+                            <span>Applicants ({registeredCount})</span>
                           </button>
 
                           <div className="flex items-center gap-1">
@@ -2328,6 +2656,7 @@ export default function AdminPanel({
                                   companyName: drive.companyName || '',
                                   companyLogo: drive.companyLogo || '',
                                   title: drive.title,
+                                  slug: drive.slug || generateDriveSlug(drive.companyName, drive.title, drive.id),
                                   description: drive.description || '',
                                   driveType: drive.driveType || 'off-campus',
                                   formFields: drive.formFields && drive.formFields.length > 0
@@ -2344,7 +2673,13 @@ export default function AdminPanel({
                                   openingDate: drive.openingDate || '',
                                   deadline: drive.deadline || '',
                                   selectionProcess: drive.selectionProcess || '',
-                                  status: drive.status
+                                  status: drive.status,
+                                  googleFormUrl: drive.googleFormUrl || '',
+                                  whatsappGroupUrl: drive.whatsappGroupUrl || '',
+                                  applyMode: drive.applyMode || 'internal',
+                                  domain: drive.domain || '',
+                                  domainLabel: drive.domainLabel || '',
+                                  salaryBand: drive.salaryBand || ''
                                 });
                                 setIsDriveModalOpen(true);
                               }}
@@ -2555,6 +2890,83 @@ export default function AdminPanel({
                         </div>
                       </div>
 
+                      {/* Unique Shareable Public URL Slug Block */}
+                      <div className="sm:col-span-2 bg-gradient-to-r from-indigo-950/70 to-slate-900 border border-indigo-500/40 rounded-xl p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Link2 className="w-4 h-4 text-indigo-400" />
+                            <span className="font-bold text-xs text-white uppercase tracking-wider">
+                              Unique Placement Drive URL (Direct Share)
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-indigo-300 bg-indigo-900/60 px-2 py-0.5 rounded border border-indigo-700/50">
+                            Student Direct Landing Link
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-slate-300 font-bold uppercase text-[10px]">
+                              URL Slug (Customizable or Auto-Generated)
+                            </label>
+                            <span className="text-[9px] text-slate-400">
+                              Letters, numbers, and hyphens only
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <span className="absolute left-3 top-2 text-slate-500 font-mono text-xs select-none">
+                                #/drive/
+                              </span>
+                              <input
+                                type="text"
+                                placeholder="e.g. infosys-systems-engineer"
+                                value={driveForm.slug || ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const clean = raw.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-');
+                                  setDriveForm({ ...driveForm, slug: clean });
+                                }}
+                                className="w-full pl-18 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const generated = generateDriveSlug(driveForm.companyName, driveForm.title, selectedDrive?.id);
+                                setDriveForm({ ...driveForm, slug: generated });
+                              }}
+                              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors whitespace-nowrap cursor-pointer shadow-xs"
+                              title="Auto-generate slug from Company Name and Job Title"
+                            >
+                              Auto-Generate
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
+                            <div className="truncate flex-1 mr-2">
+                              <span>Full Link: </span>
+                              <span className="text-indigo-300 font-mono select-all">
+                                {typeof window !== 'undefined'
+                                  ? `${window.location.origin}/#/drive/${driveForm.slug || generateDriveSlug(driveForm.companyName, driveForm.title, selectedDrive?.id || 'drive')}`
+                                  : `/#/drive/${driveForm.slug || 'drive'}`}
+                              </span>
+                            </div>
+                            <a
+                              href={typeof window !== 'undefined'
+                                ? `${window.location.origin}/#/drive/${driveForm.slug || generateDriveSlug(driveForm.companyName, driveForm.title, selectedDrive?.id || 'drive')}`
+                                : `/#/drive/${driveForm.slug || 'drive'}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-indigo-400 hover:text-indigo-200 underline font-semibold shrink-0 cursor-pointer inline-flex items-center gap-1"
+                              title="Directly test this drive's unique URL in new tab"
+                            >
+                              <span>Open Preview</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="space-y-1">
                         <label className="text-slate-400 font-bold uppercase text-[10px]">Job Title / Role *</label>
                         <input
@@ -2575,6 +2987,60 @@ export default function AdminPanel({
                           onChange={(e) => setDriveForm({ ...driveForm, salary: e.target.value })}
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         />
+                      </div>
+
+                      {/* Career Stream / Academic Domain (Optional) */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-slate-400 font-bold uppercase text-[10px]">
+                            Career Stream / Domain (Optional)
+                          </label>
+                          <span className="text-[9px] text-emerald-400 font-medium">Student Filter</span>
+                        </div>
+                        <select
+                          value={driveForm.domain || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const found = PREDEFINED_DOMAINS.find(d => d.id === val);
+                            setDriveForm({
+                              ...driveForm,
+                              domain: val,
+                              domainLabel: found ? found.label : ''
+                            });
+                          }}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white font-medium focus:border-emerald-500 focus:outline-none"
+                        >
+                          <option value="">Auto-Detect from Role & Skills (Default)</option>
+                          {PREDEFINED_DOMAINS.map(d => (
+                            <option key={d.id} value={d.id}>{d.label}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-slate-500">
+                          Optional. If left unselected, domain filter automatically matches role & skills keywords.
+                        </p>
+                      </div>
+
+                      {/* Standardized Salary Band (Optional) */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-slate-400 font-bold uppercase text-[10px]">
+                            Standardized Salary Band (Optional)
+                          </label>
+                          <span className="text-[9px] text-emerald-400 font-medium">Salary Key</span>
+                        </div>
+                        <select
+                          value={driveForm.salaryBand || ''}
+                          onChange={(e) => setDriveForm({ ...driveForm, salaryBand: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white font-medium focus:border-emerald-500 focus:outline-none"
+                        >
+                          <option value="">Auto-Detect from Package CTC (Default)</option>
+                          {STANDARDIZED_SALARY_BANDS.map(b => (
+                            <option key={b.id} value={b.id}>{b.label} ({b.range})</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-slate-500">
+                          Optional. If left unselected, salary band filter automatically matches from CTC numbers.
+                        </p>
                       </div>
 
                       <div className="space-y-1">
@@ -2616,9 +3082,20 @@ export default function AdminPanel({
                         <label className="text-slate-400 font-bold uppercase text-[10px]">Eligible Passing Batch</label>
                         <input
                           type="text"
-                          placeholder="e.g. 2024 & 2025"
+                          placeholder="e.g. 2024 & 2025 or All Batches"
                           value={driveForm.eligibleBatch || ''}
                           onChange={(e) => setDriveForm({ ...driveForm, eligibleBatch: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-slate-400 font-bold uppercase text-[10px]">Required Experience</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Freshers / 0-2 Years / Any"
+                          value={driveForm.experience || ''}
+                          onChange={(e) => setDriveForm({ ...driveForm, experience: e.target.value })}
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         />
                       </div>
@@ -2689,6 +3166,63 @@ export default function AdminPanel({
                           onChange={(e) => setDriveForm({ ...driveForm, description: e.target.value })}
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
                         />
+                      </div>
+
+                      {/* Google Form & External Form Link Integration */}
+                      <div className="sm:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 space-y-3">
+                        <div>
+                          <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                            Google Form & External Application Link
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            Connect an official Google Form or control the questions directly via the Dynamic Form Builder tab.
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2 space-y-1">
+                            <label className="text-slate-400 font-bold uppercase text-[10px]">Google Form URL / External Link</label>
+                            <input
+                              type="url"
+                              placeholder="https://docs.google.com/forms/d/e/.../viewform"
+                              value={driveForm.googleFormUrl || ''}
+                              onChange={(e) => setDriveForm({ ...driveForm, googleFormUrl: e.target.value })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-slate-400 font-bold uppercase text-[10px]">Application Form Mode</label>
+                            <select
+                              value={driveForm.applyMode || 'internal'}
+                              onChange={(e) => setDriveForm({ ...driveForm, applyMode: e.target.value as any })}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs font-bold"
+                            >
+                              <option value="internal">Dynamic Internal Form (Admin Controlled)</option>
+                              <option value="google-form">Google Form (Direct Link)</option>
+                              <option value="both">Both (Show Google Form Link + Internal Form)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* WhatsApp Group Link Field */}
+                        <div className="pt-3 border-t border-slate-700/80 space-y-1">
+                          <label className="text-slate-300 font-bold text-xs flex items-center gap-1.5">
+                            <span className="text-[#25D366]">💬</span>
+                            <span>WhatsApp Group Invite Link (Optional)</span>
+                            <span className="text-[10px] text-slate-400 font-normal">• Company updates group</span>
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://chat.whatsapp.com/..."
+                            value={driveForm.whatsappGroupUrl || ''}
+                            onChange={(e) => setDriveForm({ ...driveForm, whatsappGroupUrl: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                          />
+                          <p className="text-[10px] text-slate-400">
+                            When provided, students who submit an application will see a "Join the Group" button directing them to this WhatsApp invite on the success screen and in their email confirmation.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -3061,6 +3595,7 @@ export default function AdminPanel({
                             ...driveForm,
                             companyName: driveForm.companyName || partner?.name || '',
                             companyLogo: driveForm.companyLogo || partner?.logoUrl || '',
+                            slug: driveForm.slug || generateDriveSlug(driveForm.companyName || partner?.name || '', driveForm.title, selectedDrive?.id),
                             formFields: driveForm.formFields,
                             id: selectedDrive ? selectedDrive.id : `drive-${Date.now()}`
                           };
@@ -3421,21 +3956,31 @@ export default function AdminPanel({
         {/* TAB 5: COURSES SYLLABUS */}
         {activeTab === 'courses' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Courses & Syllabus Syllabus</h1>
-                <p className="text-slate-500">Manage syllabus content, topics, module duration, and stream categories.</p>
+                <p className="text-slate-500">Manage syllabus content, topics, module duration, and stream categories directly on MongoDB Atlas.</p>
               </div>
-              <button 
-                onClick={() => {
-                  setSelectedCourse({ id: `course-${Date.now()}`, name: '', category: 'programming', description: '', duration: '8 Weeks', topics: [], imageUrl: '', level: 'Beginner' });
-                  setCourseForm({ name: '', category: 'programming', description: '', duration: '8 Weeks', topics: [], imageUrl: '', level: 'Beginner' });
-                }}
-                className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg shadow"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add New Syllabus Course</span>
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button 
+                  onClick={() => saveCollectionToDatabase('courses', courses, 'Courses')}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                  title="Explicitly save and sync all courses to MongoDB Atlas"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save to MongoDB Atlas</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setSelectedCourse({ id: `course-${Date.now()}`, name: '', category: 'programming', description: '', duration: '8 Weeks', topics: [], imageUrl: '', level: 'Beginner' });
+                    setCourseForm({ name: '', category: 'programming', description: '', duration: '8 Weeks', topics: [], imageUrl: '', level: 'Beginner' });
+                  }}
+                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg shadow cursor-pointer text-xs"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add New Syllabus Course</span>
+                </button>
+              </div>
             </div>
 
             {selectedCourse && (
@@ -3549,18 +4094,18 @@ export default function AdminPanel({
                   <button 
                     onClick={() => {
                       const exist = courses.some(c => c.id === selectedCourse.id);
-                      if (exist) {
-                        setCourses(courses.map(c => c.id === selectedCourse.id ? { ...c, ...courseForm } : c));
-                      } else {
-                        setCourses([...courses, { id: selectedCourse.id, ...courseForm }]);
-                      }
+                      const updated = exist
+                        ? courses.map(c => c.id === selectedCourse.id ? { ...c, ...courseForm } : c)
+                        : [...courses, { id: selectedCourse.id, ...courseForm }];
+                      setCourses(updated);
                       setSelectedCourse(null);
+                      saveCollectionToDatabase('courses', updated, 'Course');
                     }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded cursor-pointer"
                   >
                     Save Course
                   </button>
-                  <button onClick={() => setSelectedCourse(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded">
+                  <button onClick={() => setSelectedCourse(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded cursor-pointer">
                     Cancel
                   </button>
                 </div>
@@ -3609,13 +4154,18 @@ export default function AdminPanel({
                                 level: course.level || 'Beginner'
                               });
                             }}
-                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded"
+                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded cursor-pointer"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button 
-                            onClick={() => setCourses(courses.filter(c => c.id !== course.id))}
-                            className="p-1.5 hover:bg-rose-50 text-rose-600 rounded"
+                            onClick={() => {
+                              if (!confirm(`Delete course ${course.name}?`)) return;
+                              const updated = courses.filter(c => c.id !== course.id);
+                              setCourses(updated);
+                              saveCollectionToDatabase('courses', updated, 'Course');
+                            }}
+                            className="p-1.5 hover:bg-rose-50 text-rose-600 rounded cursor-pointer"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -3632,30 +4182,39 @@ export default function AdminPanel({
         {/* TAB 5.5: SERVICES CATALOG */}
         {activeTab === 'services' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Services Catalog</h1>
-                <p className="text-slate-500">Create, update, and publish service offerings used across the public services page.</p>
+                <p className="text-slate-500">Create, update, and publish service offerings used across the public services page directly on MongoDB Atlas.</p>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedService({
-                    id: `service-${Date.now()}`,
-                    title: '',
-                    slug: '',
-                    category: 'career-services',
-                    image: '',
-                    shortDescription: '',
-                    description: '',
-                    buttonText: 'Learn More',
-                    buttonLink: '#/contact',
-                    featured: false,
-                    showOnHomepage: false,
-                    published: true,
-                    order: services.length + 1,
-                    createdAt: new Date().toISOString(),
-                    seo: { title: '', description: '', keywords: '' }
-                  });
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => saveCollectionToDatabase('services', services, 'Services Catalog')}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                  title="Explicitly save and sync all services to MongoDB Atlas"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save to MongoDB Atlas</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedService({
+                      id: `service-${Date.now()}`,
+                      title: '',
+                      slug: '',
+                      category: 'career-services',
+                      image: '',
+                      shortDescription: '',
+                      description: '',
+                      buttonText: 'Learn More',
+                      buttonLink: '#/contact',
+                      featured: false,
+                      showOnHomepage: false,
+                      published: true,
+                      order: services.length + 1,
+                      createdAt: new Date().toISOString(),
+                      seo: { title: '', description: '', keywords: '' }
+                    });
                   setServiceForm({
                     title: '',
                     slug: '',
@@ -3678,6 +4237,7 @@ export default function AdminPanel({
                 <span>Add New Service</span>
               </button>
             </div>
+          </div>
 
             {selectedService && (
               <div className="bg-slate-900 text-white p-6 rounded-2xl flex flex-col gap-4 border border-slate-800">
@@ -3850,14 +4410,14 @@ export default function AdminPanel({
                         seo: serviceForm.seo
                       };
                       const exists = services.some(s => s.id === nextService.id);
-                      if (exists) {
-                        setServices(services.map(s => s.id === nextService.id ? nextService : s));
-                      } else {
-                        setServices([...services, nextService].sort((a, b) => a.order - b.order));
-                      }
+                      const updated = exists
+                        ? services.map(s => s.id === nextService.id ? nextService : s)
+                        : [...services, nextService].sort((a, b) => a.order - b.order);
+                      setServices(updated);
                       setSelectedService(null);
+                      saveCollectionToDatabase('services', updated, 'Service Offering');
                     }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded cursor-pointer"
                   >
                     Save Service
                   </button>
@@ -3952,8 +4512,13 @@ export default function AdminPanel({
                         Edit
                       </button>
                       <button
-                        onClick={() => setServices(services.filter(s => s.id !== service.id))}
-                        className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded text-[10px] font-bold transition-colors"
+                        onClick={() => {
+                          if (!confirm(`Delete service "${service.title}"?`)) return;
+                          const updated = services.filter(s => s.id !== service.id);
+                          setServices(updated);
+                          saveCollectionToDatabase('services', updated, 'Service Offering');
+                        }}
+                        className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded text-[10px] font-bold transition-colors cursor-pointer"
                       >
                         Delete
                       </button>
@@ -4213,168 +4778,498 @@ export default function AdminPanel({
           </div>
         )}
 
+        {/* TAB: FREE CANDIDATE REGISTRATIONS */}
+        {activeTab === 'free-registrations' && (
+          <div className="flex flex-col gap-6 text-left text-xs font-sans">
+            {/* Header & Export Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded font-mono">
+                    Homepage Free Form
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {freeRegistrations.length} Total Registered
+                  </span>
+                </div>
+                <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase mt-1">
+                  Candidate Free Registrations
+                </h1>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Direct candidate entries from the 100% Free Drive Access form. Includes optional candidate descriptions, special instructions, and sheet exports.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={fetchFreeRegistrations}
+                  disabled={loadingFreeRegs}
+                  className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-lg transition-all text-xs cursor-pointer"
+                  title="Refresh registration list"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingFreeRegs ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  onClick={handleExportFreeRegsCSV}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-2 rounded-lg shadow-sm transition-all text-xs cursor-pointer"
+                  title="Download candidate data as a CSV sheet"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Export to Sheet (.csv)</span>
+                </button>
+
+                <button
+                  onClick={handleExportFreeRegsExcel}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 py-2 rounded-lg shadow-sm transition-all text-xs cursor-pointer"
+                  title="Download formatted Excel workbook"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>Export Excel (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Candidates</span>
+                <span className="text-2xl font-extrabold text-slate-900 font-display mt-0.5 block">{freeRegistrations.length}</span>
+                <span className="text-[10px] text-slate-500 mt-1 block">Registered via modal</span>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+                <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">New / Pending</span>
+                <span className="text-2xl font-extrabold text-rose-600 font-display mt-0.5 block">
+                  {freeRegistrations.filter(r => (r.status || 'New').toLowerCase() === 'new').length}
+                </span>
+                <span className="text-[10px] text-slate-500 mt-1 block">Awaiting outreach</span>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Contacted</span>
+                <span className="text-2xl font-extrabold text-amber-600 font-display mt-0.5 block">
+                  {freeRegistrations.filter(r => (r.status || '').toLowerCase() === 'contacted').length}
+                </span>
+                <span className="text-[10px] text-slate-500 mt-1 block">Follow-up ongoing</span>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Reviewed / Eligible</span>
+                <span className="text-2xl font-extrabold text-emerald-600 font-display mt-0.5 block">
+                  {freeRegistrations.filter(r => (r.status || '').toLowerCase() === 'reviewed').length}
+                </span>
+                <span className="text-[10px] text-slate-500 mt-1 block">Added to drives desk</span>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchFreeRegs}
+                  onChange={(e) => setSearchFreeRegs(e.target.value)}
+                  placeholder="Search by candidate name, phone, email, degree, batch, description or instruction..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Status:</span>
+                {(['all', 'New', 'Contacted', 'Reviewed'] as const).map(st => (
+                  <button
+                    key={st}
+                    onClick={() => setFreeRegStatusFilter(st)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      freeRegStatusFilter.toLowerCase() === st.toLowerCase()
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {st === 'all' ? 'All' : st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Candidates Table */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-100 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200 text-slate-600">
+                    <tr>
+                      <th className="px-5 py-3.5">Candidate Details</th>
+                      <th className="px-5 py-3.5">Academic Profile</th>
+                      <th className="px-5 py-3.5">Description (Optional)</th>
+                      <th className="px-5 py-3.5">Instructions (Optional)</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">Submitted</th>
+                      <th className="px-5 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredFreeRegs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                          <UserCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          <p className="font-bold text-sm text-slate-700">No candidate registrations found</p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {searchFreeRegs ? "Try clearing your search query." : "Registered candidates from the homepage form will appear here."}
+                          </p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredFreeRegs.map((reg) => (
+                        <tr key={reg.id || reg._id} className="hover:bg-slate-50/70 transition-colors">
+                          {/* Candidate Info */}
+                          <td className="px-5 py-3.5">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900 text-xs">{reg.name}</span>
+                              <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                                {reg.phone && (
+                                  <a
+                                    href={`https://wa.me/${reg.phone.replace(/[^0-9]/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 font-mono"
+                                    title="Open WhatsApp chat"
+                                  >
+                                    <PhoneCall className="w-3 h-3 text-emerald-500" />
+                                    <span>{reg.phone}</span>
+                                  </a>
+                                )}
+                                {reg.email && (
+                                  <a
+                                    href={`mailto:${reg.email}`}
+                                    className="hover:text-blue-600 hover:underline inline-flex items-center gap-1"
+                                    title="Send Email"
+                                  >
+                                    <Mail className="w-3 h-3 text-slate-400" />
+                                    <span>{reg.email}</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Academic Profile */}
+                          <td className="px-5 py-3.5">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 text-[11px]">{reg.degree}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">Batch: {reg.batch}</span>
+                            </div>
+                          </td>
+
+                          {/* Description (Optional) */}
+                          <td className="px-5 py-3.5 max-w-[200px]">
+                            {reg.description ? (
+                              <div 
+                                onClick={() => setSelectedCandidateModal(reg)}
+                                className="cursor-pointer group"
+                                title="Click to view full description"
+                              >
+                                <p className="text-[11px] text-slate-700 truncate line-clamp-2 leading-snug group-hover:text-emerald-700">
+                                  {reg.description}
+                                </p>
+                                <span className="text-[9px] text-emerald-600 font-bold group-hover:underline">Read more</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">None provided</span>
+                            )}
+                          </td>
+
+                          {/* Instructions (Optional) */}
+                          <td className="px-5 py-3.5 max-w-[200px]">
+                            {reg.instruction ? (
+                              <div 
+                                onClick={() => setSelectedCandidateModal(reg)}
+                                className="cursor-pointer group"
+                                title="Click to view full instructions"
+                              >
+                                <p className="text-[11px] text-slate-700 truncate line-clamp-2 leading-snug group-hover:text-emerald-700">
+                                  {reg.instruction}
+                                </p>
+                                <span className="text-[9px] text-emerald-600 font-bold group-hover:underline">Read more</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">None provided</span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-5 py-3.5">
+                            <select
+                              value={reg.status || 'New'}
+                              onChange={(e) => handleUpdateFreeRegStatus(reg.id || reg._id || '', e.target.value as any)}
+                              className={`px-2 py-1 rounded-md font-bold uppercase text-[9px] border focus:outline-none cursor-pointer ${
+                                (reg.status || 'New').toLowerCase() === 'new'
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : (reg.status || '').toLowerCase() === 'contacted'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}
+                            >
+                              <option value="New">New</option>
+                              <option value="Contacted">Contacted</option>
+                              <option value="Reviewed">Reviewed</option>
+                              <option value="Archived">Archived</option>
+                            </select>
+                          </td>
+
+                          {/* Submitted Date */}
+                          <td className="px-5 py-3.5 text-slate-500 font-mono text-[10px] whitespace-nowrap">
+                            {reg.createdAt ? new Date(reg.createdAt).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            }) : '—'}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                onClick={() => setSelectedCandidateModal(reg)}
+                                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded cursor-pointer"
+                                title="View full profile"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFreeReg(reg.id || reg._id || '')}
+                                className="p-1.5 hover:bg-rose-50 text-rose-500 hover:text-rose-700 rounded cursor-pointer"
+                                title="Delete registration"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Candidate Details Modal */}
+            {selectedCandidateModal && (
+              <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+                <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4 text-left my-8">
+                  {/* Modal Header */}
+                  <div className="flex items-start justify-between border-b border-slate-200 pb-3">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 font-mono">
+                        Free Registered Candidate Details
+                      </span>
+                      <h3 className="text-xl font-bold text-slate-900 font-display">
+                        {selectedCandidateModal.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {selectedCandidateModal.degree} • Batch {selectedCandidateModal.batch}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedCandidateModal(null)}
+                      className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Contact Channels */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Phone / WhatsApp</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs font-bold text-slate-900 font-mono">{selectedCandidateModal.phone || '—'}</span>
+                        {selectedCandidateModal.phone && (
+                          <a
+                            href={`https://wa.me/${selectedCandidateModal.phone.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-0.5 bg-emerald-600 text-white rounded text-[10px] font-bold hover:bg-emerald-700"
+                          >
+                            WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Email Address</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs font-bold text-slate-900 truncate max-w-[160px]">{selectedCandidateModal.email || '—'}</span>
+                        {selectedCandidateModal.email && (
+                          <a
+                            href={`mailto:${selectedCandidateModal.email}`}
+                            className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] font-bold hover:bg-blue-700"
+                          >
+                            Email
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description Box */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                      Candidate Description / Profile Summary (Optional field)
+                    </span>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 leading-relaxed max-h-36 overflow-y-auto whitespace-pre-wrap">
+                      {selectedCandidateModal.description ? (
+                        selectedCandidateModal.description
+                      ) : (
+                        <span className="text-slate-400 italic">No description provided by candidate.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Instruction Box */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                      Special Instructions / Target Roles (Optional field)
+                    </span>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 leading-relaxed max-h-36 overflow-y-auto whitespace-pre-wrap">
+                      {selectedCandidateModal.instruction ? (
+                        selectedCandidateModal.instruction
+                      ) : (
+                        <span className="text-slate-400 italic">No special instructions provided by candidate.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status & Timestamp */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-600">Update Status:</span>
+                      <select
+                        value={selectedCandidateModal.status || 'New'}
+                        onChange={(e) => handleUpdateFreeRegStatus(selectedCandidateModal.id || selectedCandidateModal._id || '', e.target.value as any)}
+                        className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      >
+                        <option value="New">New</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Reviewed">Reviewed</option>
+                        <option value="Archived">Archived</option>
+                      </select>
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 font-mono">
+                      {selectedCandidateModal.createdAt ? new Date(selectedCandidateModal.createdAt).toLocaleString('en-IN') : ''}
+                    </div>
+                  </div>
+
+                  {/* Footer Close */}
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={() => setSelectedCandidateModal(null)}
+                      className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs cursor-pointer"
+                    >
+                      Close Window
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* TAB: WORKSHOPS CMS */}
         {activeTab === 'workshops-cms' && (() => {
           const workshopsPage = pages.find(p => p.id === 'workshops');
           const workshopsSection = workshopsPage?.sections.find(s => s.type === 'workshops-list');
           const workshopsContent = workshopsSection?.content || {};
-          const rawWorkshops = workshopsContent.workshops || [];
+          const rawWorkshops: WorkshopItem[] = workshopsContent.workshops || [];
 
-          // Standard 10 default workshops as fallback reference
-          const defaultWorkshops = [
-            {
-              id: "wk-1",
-              title: "Resume Building Workshop",
-              desc: "Learn to build ATS friendly resume",
-              date: "25 May, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming",
-              isFree: true,
-              price: 0
-            },
-            {
-              id: "wk-2",
-              title: "Interview Preparation Workshop",
-              desc: "Crack interviews with confidence",
-              date: "01 June, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1573497191269-cc6db3aad297?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming",
-              isFree: false,
-              price: 199
-            },
-            {
-              id: "wk-3",
-              title: "Group Discussion Mastery",
-              desc: "Learn to lead group discussions. Gain templates to pitch your solutions confidently.",
-              date: "15 June, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming",
-              isFree: true,
-              price: 0
-            },
-            {
-              id: "wk-4",
-              title: "LinkedIn Branding Clinic",
-              desc: "Learn secrets to draft a profile summary, customize headlines, and message HRs directly.",
-              date: "22 June, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming",
-              isFree: false,
-              price: 299
-            },
-            {
-              id: "wk-5",
-              title: "Aptitude & Speed Math Masterclass",
-              desc: "Crack high-frequency aptitude questions and speed calculation patterns.",
-              date: "29 June, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming",
-              isFree: true,
-              price: 0
-            },
-            {
-              id: "wk-6",
-              title: "MNC Placement Mock Drill",
-              desc: "Observe a live simulated interview mimicking Tier-1 tech company rounds.",
-              date: "06 July, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=500",
-              status: "upcoming",
-              isFree: false,
-              price: 499
-            },
-            {
-              id: "past-1",
-              title: "React & Frontend Architecture BootCamp",
-              desc: "A 2-day session covering component optimization, server rendering, and modern state managers.",
-              date: "10 May, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-2",
-              title: "Java Full-Stack & Microservices Seminar",
-              desc: "A hands-on walk-through of Spring Boot, API gateway setups, and database orchestration.",
-              date: "03 May, 2025",
-              location: "Indore",
-              image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-3",
-              title: "Campus to Corporate Transition Meet",
-              desc: "Essential soft-skills and workspace etiquette guidelines delivered by corporate HR headers.",
-              date: "25 April, 2025",
-              location: "Bhopal",
-              image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            },
-            {
-              id: "past-4",
-              title: "SQL & Relational Database Essentials",
-              desc: "Master indexes, complex joins, subqueries, and execution plan optimizations for technical interviews.",
-              date: "18 April, 2025",
-              location: "Online Live",
-              image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&q=80&w=500",
-              status: "past"
-            }
-          ];
+          // Strictly use real workshops from database - NO mock fallbacks
+          const currentWorkshops: WorkshopItem[] = [...rawWorkshops];
+          const galleryImages: string[] = workshopsContent.galleryImages || [];
 
-          // Merge if needed so that first-time load contains all 10 workshops
-          const currentWorkshops = [...rawWorkshops];
-          if (currentWorkshops.length === 0 || !workshopsContent.isWorkshopsCustomized) {
-            defaultWorkshops.forEach((dw) => {
-              if (!currentWorkshops.some(w => w.title.toLowerCase() === dw.title.toLowerCase() || w.id === dw.id)) {
-                currentWorkshops.push(dw);
-              }
-            });
-          }
+          const getWorkshopsPageObject = (wList: any[], gImages: string[]): CMSPage => {
+            const curWorkshopsPage = pages.find(p => p.id === 'workshops');
+            const defaultDesign = {
+              backgroundColor: '#ffffff',
+              textColor: '#111111',
+              headingColor: '#111111',
+              borderRadius: '12px',
+              paddingY: '12',
+              animation: 'none' as const
+            };
 
-          const galleryImages = workshopsContent.galleryImages || [
-            "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
-            "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=400",
-            "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=400",
-            "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400",
-            "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=500",
-            "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
-            "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
-            "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500"
-          ];
+            const defaultHeroSec: CMSSection = {
+              id: 'sec-workshops-hero',
+              type: 'hero',
+              title: 'Practical Upskilling & Engineering Masterclasses',
+              subtitle: 'Hands-on technical workshops, resume clinics, and live mock interview panels led by industry veterans.',
+              content: {},
+              design: defaultDesign
+            };
+            const defaultListSec: CMSSection = {
+              id: 'sec-workshops-list',
+              type: 'workshops-list',
+              title: 'Upcoming Campus Workshops',
+              subtitle: 'Reserve your verified seat, receive official Admit Cards, and unlock lifetime session recordings.',
+              content: {
+                workshops: wList,
+                galleryImages: gImages,
+                isWorkshopsCustomized: true
+              },
+              design: defaultDesign
+            };
+
+            const existingSections = curWorkshopsPage?.sections && curWorkshopsPage.sections.length > 0
+              ? curWorkshopsPage.sections
+              : [defaultHeroSec, defaultListSec];
+
+            const hasListSec = existingSections.some(s => s.type === 'workshops-list');
+            const updatedSections = hasListSec
+              ? existingSections.map(section => {
+                  if (section.type === 'workshops-list') {
+                    return {
+                      ...section,
+                      content: {
+                        ...section.content,
+                        workshops: wList,
+                        galleryImages: gImages,
+                        isWorkshopsCustomized: true
+                      }
+                    };
+                  }
+                  return section;
+                })
+              : [...existingSections, defaultListSec];
+
+            return {
+              ...(curWorkshopsPage || {
+                id: 'workshops',
+                title: 'Workshops & Placement Clinics',
+                slug: '/workshops',
+                seo: {
+                  title: 'Workshops & Placement Clinics | TantraPex Technologies',
+                  description: 'Hands-on technical workshops, resume clinics, and live mock interview panels led by industry veterans.',
+                  keywords: 'workshops, resume clinic, mock interview, placement training, technical bootcamps'
+                }
+              }),
+              sections: updatedSections
+            };
+          };
 
           const handleSaveGallery = (updatedGallery: string[]) => {
+            const updatedPage = getWorkshopsPageObject(currentWorkshops, updatedGallery);
             setPages(prevPages => {
-              return prevPages.map(page => {
-                if (page.id === 'workshops') {
-                  return {
-                    ...page,
-                    sections: page.sections.map(section => {
-                      if (section.type === 'workshops-list') {
-                        return {
-                          ...section,
-                          content: {
-                            ...section.content,
-                            galleryImages: updatedGallery,
-                            isWorkshopsCustomized: true
-                          }
-                        };
-                      }
-                      return section;
-                    })
-                  };
-                }
-                return page;
-              });
+              const exists = prevPages.some(p => p.id === 'workshops');
+              if (exists) {
+                return prevPages.map(page => page.id === 'workshops' ? updatedPage : page);
+              }
+              return [...prevPages, updatedPage];
             });
+            savePageToDatabase(updatedPage);
           };
 
           const handleSaveWorkshop = () => {
-            let updatedList = [];
+            let updatedList: any[] = [];
             const isEditing = currentWorkshops.some(w => w.id === selectedWorkshop.id);
             if (isEditing) {
               updatedList = currentWorkshops.map(w => w.id === selectedWorkshop.id ? { ...w, ...workshopForm } : w);
@@ -4382,60 +5277,31 @@ export default function AdminPanel({
               updatedList = [...currentWorkshops, { id: selectedWorkshop.id, ...workshopForm }];
             }
 
+            const updatedPage = getWorkshopsPageObject(updatedList, galleryImages);
             setPages(prevPages => {
-              return prevPages.map(page => {
-                if (page.id === 'workshops') {
-                  return {
-                    ...page,
-                    sections: page.sections.map(section => {
-                      if (section.type === 'workshops-list') {
-                        return {
-                          ...section,
-                          content: {
-                            ...section.content,
-                            workshops: updatedList,
-                            isWorkshopsCustomized: true
-                          }
-                        };
-                      }
-                      return section;
-                    })
-                  };
-                }
-                return page;
-              });
+              const exists = prevPages.some(p => p.id === 'workshops');
+              if (exists) {
+                return prevPages.map(page => page.id === 'workshops' ? updatedPage : page);
+              }
+              return [...prevPages, updatedPage];
             });
-
             setSelectedWorkshop(null);
+            savePageToDatabase(updatedPage);
           };
 
           const handleDeleteWorkshop = (id: string) => {
             if (!confirm("Are you sure you want to delete this workshop?")) return;
             const updatedList = currentWorkshops.filter(w => w.id !== id);
 
+            const updatedPage = getWorkshopsPageObject(updatedList, galleryImages);
             setPages(prevPages => {
-              return prevPages.map(page => {
-                if (page.id === 'workshops') {
-                  return {
-                    ...page,
-                    sections: page.sections.map(section => {
-                      if (section.type === 'workshops-list') {
-                        return {
-                          ...section,
-                          content: {
-                            ...section.content,
-                            workshops: updatedList,
-                            isWorkshopsCustomized: true
-                          }
-                        };
-                      }
-                      return section;
-                    })
-                  };
-                }
-                return page;
-              });
+              const exists = prevPages.some(p => p.id === 'workshops');
+              if (exists) {
+                return prevPages.map(page => page.id === 'workshops' ? updatedPage : page);
+              }
+              return [...prevPages, updatedPage];
             });
+            savePageToDatabase(updatedPage);
           };
 
           return (
@@ -4443,27 +5309,157 @@ export default function AdminPanel({
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Workshops & Placement Seminars CRM</h1>
-                  <p className="text-slate-500 font-sans mt-1">Add, edit, or delete dynamic corporate workshops and placement clinics.</p>
+                  <p className="text-slate-500 font-sans mt-1">Add, edit, or delete dynamic corporate workshops and placement clinics directly on MongoDB.</p>
                 </div>
-                <button 
-                  onClick={() => {
-                    const nextId = `wk-${Date.now()}`;
-                    setSelectedWorkshop({ id: nextId });
-                    setWorkshopForm({
-                      title: '',
-                      desc: '',
-                      date: '30 June, 2026',
-                      location: 'Bhopal',
-                      image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=500',
-                      status: 'upcoming'
-                    });
-                  }}
-                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add New Workshop</span>
-                </button>
+                <div className="flex items-center gap-2.5">
+                  <button 
+                    onClick={() => {
+                      const pageToSave = getWorkshopsPageObject(currentWorkshops, galleryImages);
+                      setPages(prevPages => {
+                        const exists = prevPages.some(p => p.id === 'workshops');
+                        if (exists) {
+                          return prevPages.map(page => page.id === 'workshops' ? pageToSave : page);
+                        }
+                        return [...prevPages, pageToSave];
+                      });
+                      savePageToDatabase(pageToSave);
+                    }}
+                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                    title="Explicitly save and sync all workshops to MongoDB"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>Save to MongoDB</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const nextId = `wk-${Date.now()}`;
+                      setSelectedWorkshop({ id: nextId });
+                      setWorkshopForm({
+                        title: '',
+                        desc: '',
+                        date: '30 June, 2026',
+                        location: 'Bhopal',
+                        image: '',
+                        status: 'upcoming',
+                        isFree: true,
+                        price: 0,
+                        images: []
+                      });
+                    }}
+                    className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg transition-colors shadow cursor-pointer text-xs"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add New Workshop</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Per-Workshop Multi-Image Upload Modal */}
+              {selectedWorkshopForPhotos && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                  <div className="bg-white rounded-2xl max-w-2xl w-full p-6 border border-slate-200 shadow-2xl flex flex-col gap-5 text-slate-800">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                          <Camera className="h-5 w-5 text-blue-600" />
+                          <span>Manage Photos: {selectedWorkshopForPhotos.title}</span>
+                        </h3>
+                        <p className="text-slate-500 text-xs mt-0.5">
+                          Upload multiple photos for this session. All photos will automatically appear in 'Glimpses from our Workshops' with interactive workshop filters.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedWorkshopForPhotos(null)}
+                        className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Multi image uploader */}
+                    <UniversalMultiImageUploader
+                      label="Upload Session Photos (Choose multiple files or paste URLs)"
+                      onImagesUploaded={(newUrls) => {
+                        const existingPhotos = Array.isArray(selectedWorkshopForPhotos.images) ? selectedWorkshopForPhotos.images : [];
+                        const updatedPhotos = [...existingPhotos, ...newUrls];
+                        const updatedWorkshop = { ...selectedWorkshopForPhotos, images: updatedPhotos };
+                        const updatedList = currentWorkshops.map(w => w.id === selectedWorkshopForPhotos.id ? updatedWorkshop : w);
+                        setSelectedWorkshopForPhotos(updatedWorkshop);
+                        const updatedPage = getWorkshopsPageObject(updatedList, galleryImages);
+                        setPages(prevPages => prevPages.map(page => page.id === 'workshops' ? updatedPage : page));
+                        savePageToDatabase(updatedPage);
+                      }}
+                      helperText="Drag & drop multiple event images, or select multiple files from your computer at once."
+                    />
+
+                    {/* Existing photos preview grid */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Uploaded Photos ({selectedWorkshopForPhotos.images?.length || 0})
+                        </span>
+                        {selectedWorkshopForPhotos.images && selectedWorkshopForPhotos.images.length > 0 && (
+                          <button
+                            onClick={() => {
+                              if (confirm("Remove all photos from this workshop?")) {
+                                const updatedWorkshop = { ...selectedWorkshopForPhotos, images: [] };
+                                const updatedList = currentWorkshops.map(w => w.id === selectedWorkshopForPhotos.id ? updatedWorkshop : w);
+                                setSelectedWorkshopForPhotos(updatedWorkshop);
+                                const updatedPage = getWorkshopsPageObject(updatedList, galleryImages);
+                                setPages(prevPages => prevPages.map(page => page.id === 'workshops' ? updatedPage : page));
+                                savePageToDatabase(updatedPage);
+                              }
+                            }}
+                            className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                          >
+                            Clear All Photos
+                          </button>
+                        )}
+                      </div>
+
+                      {(!selectedWorkshopForPhotos.images || selectedWorkshopForPhotos.images.length === 0) ? (
+                        <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
+                          No photos uploaded for this workshop yet. Use the upload box above to add event photos.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-1">
+                          {selectedWorkshopForPhotos.images.map((imgUrl: string, idx: number) => (
+                            <div key={idx} className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                              <img src={imgUrl} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <button
+                                  onClick={() => {
+                                    const updatedPhotos = (selectedWorkshopForPhotos.images || []).filter((_: any, pIdx: number) => pIdx !== idx);
+                                    const updatedWorkshop = { ...selectedWorkshopForPhotos, images: updatedPhotos };
+                                    const updatedList = currentWorkshops.map(w => w.id === selectedWorkshopForPhotos.id ? updatedWorkshop : w);
+                                    setSelectedWorkshopForPhotos(updatedWorkshop);
+                                    const updatedPage = getWorkshopsPageObject(updatedList, galleryImages);
+                                    setPages(prevPages => prevPages.map(page => page.id === 'workshops' ? updatedPage : page));
+                                    savePageToDatabase(updatedPage);
+                                  }}
+                                  className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full transition-transform hover:scale-110 cursor-pointer shadow"
+                                  title="Delete photo"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end pt-3 border-t border-slate-100">
+                      <button
+                        onClick={() => setSelectedWorkshopForPhotos(null)}
+                        className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Edit Form */}
               {selectedWorkshop && (
@@ -4498,7 +5494,7 @@ export default function AdminPanel({
                         value={workshopForm.date} 
                         onChange={(e) => setWorkshopForm({ ...workshopForm, date: e.target.value })}
                         className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-blue-500 font-mono" 
-                        placeholder="e.g. 25 May, 2025"
+                        placeholder="e.g. 25 May, 2026 or 2026-06-30"
                       />
                     </div>
 
@@ -4533,9 +5529,10 @@ export default function AdminPanel({
                         onChange={(e) => setWorkshopForm({ ...workshopForm, status: e.target.value })}
                         className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:outline-none focus:border-blue-500"
                       >
-                        <option value="upcoming">Upcoming (Accepting registrations)</option>
-                        <option value="past">Past / Completed (Show in history)</option>
+                        <option value="upcoming">Upcoming (Accepting registrations until date passes)</option>
+                        <option value="past">Past / Completed (Show in past history)</option>
                       </select>
+                      <span className="text-[10px] text-slate-400 mt-0.5">Note: Workshops whose event date has passed will automatically transition to Past Workshops.</span>
                     </div>
                   </div>
 
@@ -4568,6 +5565,40 @@ export default function AdminPanel({
                     )}
                   </div>
 
+                  {/* Multi-Image Upload inside edit form */}
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
+                    <span className="font-bold text-slate-300 uppercase text-[10px]">Workshop Session Photos ({workshopForm.images?.length || 0})</span>
+                    <UniversalMultiImageUploader
+                      label="Upload Multiple Event Photos"
+                      onImagesUploaded={(newUrls) => {
+                        const cur = Array.isArray(workshopForm.images) ? workshopForm.images : [];
+                        setWorkshopForm((prev: any) => ({ ...prev, images: [...cur, ...newUrls] }));
+                      }}
+                      helperText="Photos uploaded here will appear in 'Glimpses from our Workshops' and can be filtered by this workshop."
+                    />
+                    {Array.isArray(workshopForm.images) && workshopForm.images.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-2">
+                        {workshopForm.images.map((img: string, idx: number) => (
+                          <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-800 aspect-video">
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setWorkshopForm((prev: any) => ({
+                                  ...prev,
+                                  images: prev.images.filter((_: any, pIdx: number) => pIdx !== idx)
+                                }));
+                              }}
+                              className="absolute inset-0 bg-rose-900/80 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-xs font-bold"
+                            >
+                              ✕ Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex items-center gap-2 mt-2">
                     <button 
                       onClick={handleSaveWorkshop}
@@ -4590,7 +5621,7 @@ export default function AdminPanel({
                 <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                   <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Workshops Directory ({currentWorkshops.length} total)</span>
                   {workshopsContent.isWorkshopsCustomized && (
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[9px] font-bold rounded uppercase">Custom Configuration Saved</span>
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[9px] font-bold rounded uppercase">Database Config Active</span>
                   )}
                 </div>
 
@@ -4600,6 +5631,7 @@ export default function AdminPanel({
                       <tr className="bg-slate-100/50 text-slate-400 uppercase text-[9px] font-bold border-b border-slate-200">
                         <th className="p-4">Cover Image</th>
                         <th className="p-4">Workshop Detail</th>
+                        <th className="p-4">Photos</th>
                         <th className="p-4">Price / Fee</th>
                         <th className="p-4">Schedule</th>
                         <th className="p-4">Location</th>
@@ -4608,56 +5640,80 @@ export default function AdminPanel({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {currentWorkshops.map((item, idx) => (
-                        <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4">
-                            <img src={item.image} alt="" className="h-12 w-20 object-cover rounded-lg border border-slate-100 shadow-sm" />
-                          </td>
-                          <td className="p-4">
-                            <div className="font-bold text-slate-900 text-sm">{item.title}</div>
-                            <div className="text-slate-500 text-[10px] mt-0.5 line-clamp-1">{item.desc}</div>
-                          </td>
-                          <td className="p-4">
-                            {item.isFree || !item.price ? (
-                              <span className="px-2 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold rounded">FREE</span>
-                            ) : (
-                              <span className="px-2 py-1 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-bold font-mono rounded">₹{item.price}</span>
-                            )}
-                          </td>
-                          <td className="p-4 font-mono font-semibold text-slate-700">{item.date}</td>
-                          <td className="p-4 text-slate-600">{item.location}</td>
-                          <td className="p-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                              item.status === 'upcoming' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {item.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button 
-                                onClick={() => {
-                                  setSelectedWorkshop(item);
-                                  setWorkshopForm({ ...item });
-                                }}
-                                className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors cursor-pointer"
-                                title="Edit Session"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteWorkshop(item.id)}
-                                className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors cursor-pointer"
-                                title="Delete Session"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
+                      {currentWorkshops.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-slate-400">
+                            No workshops found in database. Click "Add New Workshop" to schedule your first session.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        currentWorkshops.map((item, idx) => (
+                          <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-4">
+                              {item.image ? (
+                                <img src={item.image} alt="" className="h-12 w-20 object-cover rounded-lg border border-slate-100 shadow-sm" />
+                              ) : (
+                                <div className="h-12 w-20 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[10px]">No image</div>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <div className="font-bold text-slate-900 text-sm">{item.title}</div>
+                              <div className="text-slate-500 text-[10px] mt-0.5 line-clamp-1">{item.desc}</div>
+                            </td>
+                            <td className="p-4">
+                              <button
+                                onClick={() => setSelectedWorkshopForPhotos(item)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all border border-blue-200 cursor-pointer shadow-sm"
+                                title="Upload multiple event photos for this specific workshop"
+                              >
+                                <Camera className="h-3.5 w-3.5 text-blue-600" />
+                                <span>Photos ({item.images?.length || 0})</span>
+                              </button>
+                            </td>
+                            <td className="p-4">
+                              {item.isFree || !item.price ? (
+                                <span className="px-2 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold rounded">FREE</span>
+                              ) : (
+                                <span className="px-2 py-1 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-bold font-mono rounded">₹{item.price}</span>
+                              )}
+                            </td>
+                            <td className="p-4 font-mono font-semibold text-slate-700">{item.date}</td>
+                            <td className="p-4 text-slate-600">{item.location}</td>
+                            <td className="p-4">
+                              {isWorkshopPast(item) ? (
+                                <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider font-mono bg-slate-100 text-slate-700 border border-slate-200">
+                                  Past / Concluded
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Upcoming
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button 
+                                  onClick={() => {
+                                    setSelectedWorkshop(item);
+                                    setWorkshopForm({ ...item, images: item.images || [] });
+                                  }}
+                                  className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors cursor-pointer"
+                                  title="Edit Session"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteWorkshop(item.id)}
+                                  className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete Session"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -4666,8 +5722,8 @@ export default function AdminPanel({
               {/* Workshop Gallery/Glimpses Editor */}
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm p-6 flex flex-col gap-6">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 uppercase">Workshop Glimpses & Gallery Editor</h3>
-                  <p className="text-slate-500 text-[11px] mt-0.5 font-sans">Manage the dynamic photos displayed in the 'Glimpses from our Workshops' section and the 'Gallery' tab of the Workshops page.</p>
+                  <h3 className="text-base font-bold text-slate-900 uppercase">General Workshop Gallery Editor</h3>
+                  <p className="text-slate-500 text-[11px] mt-0.5 font-sans">Manage general photos displayed in the 'Glimpses from our Workshops' section and the 'Gallery' tab. (Photos attached directly to workshops above will also automatically be included!)</p>
                 </div>
 
                 {/* Multi image upload and URL paste form */}
@@ -4685,32 +5741,12 @@ export default function AdminPanel({
                 {/* Grid of current images */}
                 <div>
                   <div className="flex items-center justify-between mb-3 font-sans">
-                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Current Gallery Photos ({galleryImages.length})</span>
-                    <button
-                      onClick={() => {
-                        if (confirm("Reset gallery back to the default 8 Unsplash photos? This will overwrite your custom gallery images.")) {
-                          handleSaveGallery([
-                            "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
-                            "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=400",
-                            "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=400",
-                            "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=400",
-                            "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=500",
-                            "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=500",
-                            "https://images.unsplash.com/photo-1557200134-90327ee9fafa?auto=format&fit=crop&q=80&w=500",
-                            "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=500"
-                          ]);
-                        }
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer flex items-center gap-1 font-sans"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>Reset to Defaults</span>
-                    </button>
+                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Current Standalone Gallery Photos ({galleryImages.length})</span>
                   </div>
 
                   {galleryImages.length === 0 ? (
                     <div className="text-center p-8 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-slate-400 font-sans">
-                      No gallery images uploaded yet. Use the tool above to add some or click Reset to Defaults.
+                      No standalone gallery images uploaded yet. Use the tool above to add photos, or attach photos directly to workshops in the directory.
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4 font-sans">
@@ -5393,11 +6429,19 @@ export default function AdminPanel({
         })()}
         {activeTab === 'media' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Media Library Manager</h1>
                 <p className="text-slate-500">Professional visual files directory. Host student avatars, company logos, and background photos.</p>
               </div>
+              <button 
+                onClick={() => saveCollectionToDatabase('media', media, 'Media Library')}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                title="Explicitly save and sync all media assets to MongoDB Atlas"
+              >
+                <Save className="h-4 w-4" />
+                <span>Save to MongoDB Atlas</span>
+              </button>
             </div>
 
             {/* Quick Upload Form */}
@@ -5440,7 +6484,7 @@ export default function AdminPanel({
               <button 
                 onClick={() => {
                   if (!newMediaName || !newMediaUrl) return;
-                  setMedia([...media, {
+                  const newAsset: MediaItem = {
                     id: `img-${Date.now()}`,
                     name: newMediaName,
                     url: newMediaUrl,
@@ -5448,11 +6492,14 @@ export default function AdminPanel({
                     size: "520 KB",
                     folder: "Uploads",
                     altText: newMediaName
-                  }]);
+                  };
+                  const updatedMedia = [...media, newAsset];
+                  setMedia(updatedMedia);
                   setNewMediaName('');
                   setNewMediaUrl('');
+                  saveCollectionToDatabase('media', updatedMedia, 'Media Asset');
                 }}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors shadow shrink-0 w-full sm:w-auto"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-lg transition-all shadow shrink-0 w-full sm:w-auto cursor-pointer"
               >
                 Upload Asset
               </button>
@@ -5478,8 +6525,13 @@ export default function AdminPanel({
                     </div>
                   </div>
                   <button 
-                    onClick={() => setMedia(media.filter(f => f.id !== file.id))}
-                    className="mt-2 text-rose-500 hover:bg-rose-50 py-1 rounded w-full flex items-center justify-center gap-1 font-semibold"
+                    onClick={() => {
+                      if (!confirm(`Delete media asset "${file.name}"?`)) return;
+                      const updatedMedia = media.filter(f => f.id !== file.id);
+                      setMedia(updatedMedia);
+                      saveCollectionToDatabase('media', updatedMedia, 'Media Asset');
+                    }}
+                    className="mt-2 text-rose-500 hover:bg-rose-50 py-1 rounded w-full flex items-center justify-center gap-1 font-semibold cursor-pointer"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     <span>Delete</span>
@@ -5572,9 +6624,24 @@ export default function AdminPanel({
 
           return (
             <div className="flex flex-col gap-6 text-left text-xs font-sans max-w-4xl">
-              <div>
-                <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Student LMS Dashboard CMS</h1>
-                <p className="text-slate-500">Edit every image, icon, label, progress stat, and activity card on the LMS Student Portal page.</p>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Student LMS Dashboard CMS</h1>
+                  <p className="text-slate-500">Edit every image, icon, label, progress stat, and activity card on the LMS Student Portal page directly on MongoDB Atlas.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const curLms = pages.find(p => p.id === 'lms');
+                    if (curLms) {
+                      savePageToDatabase(curLms);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                  title="Explicitly save and sync LMS dashboard configuration to MongoDB Atlas"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save LMS to MongoDB Atlas</span>
+                </button>
               </div>
 
               {/* 1. STUDENT PROFILE & ALERTS */}
@@ -5853,10 +6920,24 @@ export default function AdminPanel({
                 </div>
               </div>
 
-              {/* SUCCESS MESSAGE */}
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between text-emerald-800 font-semibold">
-                <span>Student LMS Portal configuration saved and updated instantly on database!</span>
-                <Check className="h-5 w-5 text-emerald-600 shrink-0" />
+              {/* ACTION / SAVE TO MONGODB BAR */}
+              <div className="p-4 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                <div>
+                  <span className="font-bold text-slate-800 text-xs block">Ready to publish LMS updates?</span>
+                  <span className="text-[11px] text-slate-500">Persists all LMS learning progress, icons, and student activity cards directly to Atlas.</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const curLms = pages.find(p => p.id === 'lms');
+                    if (curLms) {
+                      savePageToDatabase(curLms);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-5 py-2.5 rounded-lg transition-all shadow cursor-pointer text-xs"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save LMS to MongoDB Atlas</span>
+                </button>
               </div>
             </div>
           );
@@ -5956,9 +7037,24 @@ export default function AdminPanel({
 
           return (
             <div className="flex flex-col gap-6 text-left text-xs font-sans max-w-4xl">
-              <div>
-                <h1 className="text-xl md:text-2xl font-display font-extrabold text-[#071B4D] uppercase">Campus Ambassador CMS</h1>
-                <p className="text-slate-500">Update images, labels, list items, and timelines on the Campus Ambassador page instantly.</p>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl md:text-2xl font-display font-extrabold text-[#071B4D] uppercase">Campus Ambassador CMS</h1>
+                  <p className="text-slate-500">Update images, labels, list items, and timelines on the Campus Ambassador page directly on MongoDB Atlas.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const curAmb = pages.find(p => p.id === 'campus-ambassador');
+                    if (curAmb) {
+                      savePageToDatabase(curAmb);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                  title="Explicitly save and sync Campus Ambassador configuration to MongoDB Atlas"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save to MongoDB Atlas</span>
+                </button>
               </div>
 
               {/* 1. HERO TITLE & SUBTITLE */}
@@ -6097,10 +7193,24 @@ export default function AdminPanel({
                 </div>
               </div>
 
-              {/* SUCCESS ALERTS */}
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between text-emerald-800 font-semibold shadow-sm">
-                <span>Campus Ambassador content settings saved and updated instantly on database!</span>
-                <Check className="h-5 w-5 text-emerald-600 shrink-0" />
+              {/* ACTION / SAVE TO MONGODB BAR */}
+              <div className="p-4 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                <div>
+                  <span className="font-bold text-slate-800 text-xs block">Ready to publish Ambassador program updates?</span>
+                  <span className="text-[11px] text-slate-500">Persists benefits, milestones, illustrations, and timelines directly to Atlas.</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const curAmb = pages.find(p => p.id === 'campus-ambassador');
+                    if (curAmb) {
+                      savePageToDatabase(curAmb);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-5 py-2.5 rounded-lg transition-all shadow cursor-pointer text-xs"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save to MongoDB Atlas</span>
+                </button>
               </div>
             </div>
           );
@@ -6109,9 +7219,19 @@ export default function AdminPanel({
         {/* TAB 9: GLOBAL SETTINGS */}
         {activeTab === 'settings' && (
           <div className="flex flex-col gap-6 text-left text-xs font-sans max-w-4xl">
-            <div>
-              <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Global Settings & Branding</h1>
-              <p className="text-slate-500">Configure corporate identity, primary branding colors, contact info, and social media links.</p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h1 className="text-xl md:text-2xl font-display font-extrabold text-slate-900 uppercase">Global Settings & Branding</h1>
+                <p className="text-slate-500">Configure corporate identity, primary branding colors, contact info, and social media links directly on MongoDB Atlas.</p>
+              </div>
+              <button 
+                onClick={() => saveCollectionToDatabase('settings', [settings], 'Global Settings & Branding')}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-4 py-2 rounded-lg transition-all shadow cursor-pointer text-xs"
+                title="Explicitly save and sync all global branding settings to MongoDB Atlas"
+              >
+                <Save className="h-4 w-4" />
+                <span>Save to MongoDB Atlas</span>
+              </button>
             </div>
 
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-6">
@@ -6305,15 +7425,43 @@ export default function AdminPanel({
               </div>
 
 
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between text-emerald-800 font-semibold mt-4">
-                <span>Branding assets and settings saved and updated instantly on database!</span>
-                <Check className="h-5 w-5 text-emerald-600 shrink-0" />
+              <div className="p-4 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs mt-4">
+                <div>
+                  <span className="font-bold text-slate-800 text-xs block">Ready to sync global branding & hotline settings?</span>
+                  <span className="text-[11px] text-slate-500">Brand logos, helpline phone, emails, and address persist directly to Atlas.</span>
+                </div>
+                <button
+                  onClick={() => saveCollectionToDatabase('settings', [settings], 'Global Settings & Branding')}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-5 py-2.5 rounded-lg transition-all shadow cursor-pointer text-xs"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save All Settings to MongoDB</span>
+                </button>
               </div>
             </div>
           </div>
         )}
 
       </div>
+
+      {dbSyncToast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl flex items-center gap-3 shadow-2xl border font-sans text-xs font-bold animate-bounce ${
+          dbSyncToast.type === 'success' 
+            ? 'bg-slate-950 border-emerald-500 text-emerald-400' 
+            : dbSyncToast.type === 'loading'
+            ? 'bg-slate-950 border-blue-500 text-blue-400'
+            : 'bg-slate-950 border-rose-500 text-rose-400'
+        }`}>
+          {dbSyncToast.type === 'loading' ? (
+            <RefreshCw className="h-4 w-4 animate-spin text-blue-400" />
+          ) : dbSyncToast.type === 'success' ? (
+            <CheckCircle className="h-4 w-4 text-emerald-400" />
+          ) : (
+            <AlertCircleIcon className="h-4 w-4 text-rose-400" />
+          )}
+          <span>{dbSyncToast.message}</span>
+        </div>
+      )}
     </div>
   );
 }

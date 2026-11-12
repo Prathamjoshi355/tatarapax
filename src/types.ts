@@ -227,6 +227,21 @@ export interface Lead {
   college?: string;
 }
 
+export interface WorkshopItem {
+  id: string;
+  title: string;
+  desc?: string;
+  date: string;
+  location: string;
+  image?: string;
+  images?: string[]; // Multiple photos / glimpses from this workshop
+  status?: 'upcoming' | 'past' | string;
+  isFree?: boolean;
+  price?: number;
+  instructor?: string;
+  seats?: number;
+}
+
 export interface PlacedStudent {
   id: string;
   name: string;
@@ -312,6 +327,7 @@ export const DEFAULT_DRIVE_FORM_FIELDS: DriveFormField[] = [
 
 export interface PlacementDrive {
   id: string;
+  slug?: string; // Human-friendly unique URL slug (e.g. "infosys-specialist-programmer-2025")
   companyId: string;
   companyName?: string;
   companyLogo?: string;
@@ -330,16 +346,22 @@ export interface PlacementDrive {
   selectionProcess?: string;
   driveType?: 'off-campus' | 'on-campus'; // 'off-campus' = public open, 'on-campus' = enrolled/exclusive info showcase
   formFields?: DriveFormField[]; // Configurable dynamic form fields for this drive
+  googleFormUrl?: string; // Optional Google Form / external application form URL
+  applyMode?: 'internal' | 'google-form' | 'both'; // Whether to use internal dynamic form, Google Form, or both
+  whatsappGroupUrl?: string; // Optional dedicated WhatsApp group invite link for candidate updates
   status: 'draft' | 'published' | 'closed' | 'archived';
   createdAt: string;
   updatedAt?: string;
   shortCode?: string;
   category?: 'it' | 'core' | 'product' | string;
   categoryLabel?: string;
+  domain?: string;
+  domainLabel?: string;
   salaryBand?: 'Category A' | 'Category B' | 'Category C' | 'Category D' | string;
   salarySubtext?: string;
   statusBadge?: string;
   statusSubtext?: string;
+  applicantCount?: number;
   batchSubtext?: string;
 }
 
@@ -409,4 +431,21 @@ export interface Course {
   imageUrl?: string;
   level?: string; // e.g. Beginner, Intermediate, Advanced
 }
+
+export interface FreeCandidateRegistration {
+  id: string;
+  _id?: string;
+  name: string;
+  phone: string;
+  email: string;
+  degree: string;
+  batch: string;
+  description?: string;
+  instruction?: string;
+  status: 'New' | 'Contacted' | 'Reviewed' | 'Archived';
+  source?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 

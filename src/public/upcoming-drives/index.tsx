@@ -1,10 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PlacementDrive, CMSPage, GlobalSettings } from '../../types';
-import { DEFAULT_PLACEMENT_DRIVES_LIST, DEFAULT_UPCOMING_DRIVES_SECTIONS } from '../../lib/defaultDrives';
+import { 
+  DEFAULT_PLACEMENT_DRIVES_LIST, 
+  DEFAULT_UPCOMING_DRIVES_SECTIONS, 
+  isDriveExpired,
+  PREDEFINED_DOMAINS,
+  STANDARDIZED_SALARY_BANDS,
+  matchesDriveDomain,
+  matchesDriveSalaryBand,
+  getDriveSlug
+} from '../../lib/defaultDrives';
+import DriveApplicationModal from '../../components/drives/DriveApplicationModal';
+import DriveDetailsModal from '../../components/drives/DriveDetailsModal';
 import { 
   Building2, MapPin, Calendar, Award, Briefcase, Search, Filter, 
   ArrowRight, CheckCircle2, Clock, Info, X, Lock, Globe, ShieldCheck, 
-  RotateCw, AlertCircle, Phone, BookOpen, Send, Sparkles, School, GraduationCap
+  RotateCw, AlertCircle, Phone, BookOpen, Send, Sparkles, School, GraduationCap,
+  UserPlus
 } from 'lucide-react';
 
 interface PublicUpcomingDrivesPageProps {
@@ -21,8 +33,7 @@ export default function PublicUpcomingDrivesPage({
   onEditField
 }: PublicUpcomingDrivesPageProps) {
   const [drives, setDrives] = useState<PlacementDrive[]>(() => {
-    if (propDrives && propDrives.length > 0) return propDrives;
-    return [];
+    return (propDrives && Array.isArray(propDrives)) ? propDrives : [];
   });
   const [loading, setLoading] = useState(false);
 
@@ -34,25 +45,12 @@ export default function PublicUpcomingDrivesPage({
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<'all' | 'it' | 'core' | 'product'>('all');
+  const [selectedDomain, setSelectedDomain] = useState<string>('all');
   const [selectedSalaryBand, setSelectedSalaryBand] = useState<string | null>(null);
 
   // Modals state
   const [selectedDetailDrive, setSelectedDetailDrive] = useState<PlacementDrive | null>(null);
   const [selectedApplyDrive, setSelectedApplyDrive] = useState<PlacementDrive | null>(null);
-
-  // Application form state
-  const [applyForm, setApplyForm] = useState({
-    rollNumber: '',
-    studentEmail: '',
-    fullName: '',
-    phone: '',
-    degree: '',
-    branch: '',
-    cgpa: ''
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [applySuccess, setApplySuccess] = useState(false);
 
   // Fetch drives from backend API on mount
   useEffect(() => {
@@ -94,23 +92,38 @@ export default function PublicUpcomingDrivesPage({
   const charterContent = charterSection.content || {};
   const ctaContent = ctaSection.content || {};
 
+  // Dynamic counts for each Predefined Domain
+  const domainCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: drives.length };
+    PREDEFINED_DOMAINS.forEach(dom => {
+      counts[dom.id] = drives.filter(d => matchesDriveDomain(d, dom.id)).length;
+    });
+    return counts;
+  }, [drives]);
+
+  // Dynamic counts for each Standardized Salary Band
+  const salaryBandCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    STANDARDIZED_SALARY_BANDS.forEach(band => {
+      counts[band.id] = drives.filter(d => matchesDriveSalaryBand(d, band.id)).length;
+    });
+    return counts;
+  }, [drives]);
+
   // Filtered drives calculation
   const filteredDrives = useMemo(() => {
-    return drives.filter(d => {
-      // Category filter
-      if (activeCategory !== 'all') {
-        const cat = (d.category || '').toLowerCase();
-        if (activeCategory === 'it' && cat !== 'it') return false;
-        if (activeCategory === 'core' && cat !== 'core') return false;
-        if (activeCategory === 'product' && cat !== 'product') return false;
+    const list = drives.filter(d => {
+      // 1. Domain / Career Stream filter
+      if (selectedDomain && selectedDomain !== 'all') {
+        if (!matchesDriveDomain(d, selectedDomain)) return false;
       }
 
-      // Salary Band filter (if toggled)
+      // 2. Salary Band filter (Category A, B, C, D)
       if (selectedSalaryBand) {
-        if (d.salaryBand !== selectedSalaryBand) return false;
+        if (!matchesDriveSalaryBand(d, selectedSalaryBand)) return false;
       }
 
-      // Keyword search
+      // 3. Keyword search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const nameMatch = (d.companyName || '').toLowerCase().includes(q);
@@ -119,64 +132,29 @@ export default function PublicUpcomingDrivesPage({
         const locMatch = (d.location || '').toLowerCase().includes(q);
         const codeMatch = (d.shortCode || '').toLowerCase().includes(q);
         const catMatch = (d.categoryLabel || '').toLowerCase().includes(q);
-        if (!nameMatch && !roleMatch && !skillMatch && !locMatch && !codeMatch && !catMatch) {
+        const domMatch = (d.domainLabel || d.domain || '').toLowerCase().includes(q);
+        if (!nameMatch && !roleMatch && !skillMatch && !locMatch && !codeMatch && !catMatch && !domMatch) {
           return false;
         }
       }
 
       return true;
     });
-  }, [drives, activeCategory, selectedSalaryBand, searchQuery]);
 
-  // Count by category
-  const itCount = useMemo(() => drives.filter(d => (d.category || '').toLowerCase() === 'it').length, [drives]);
-  const coreCount = useMemo(() => drives.filter(d => (d.category || '').toLowerCase() === 'core').length, [drives]);
-  const productCount = useMemo(() => drives.filter(d => (d.category || '').toLowerCase() === 'product').length, [drives]);
+    // Active unexpired drives first, expired drives at the end
+    return [...list].sort((a, b) => {
+      const aExp = isDriveExpired(a);
+      const bExp = isDriveExpired(b);
+      if (aExp && !bExp) return 1;
+      if (!aExp && bExp) return -1;
+      return 0;
+    });
+  }, [drives, selectedDomain, selectedSalaryBand, searchQuery]);
 
   const resetAllFilters = () => {
     setSearchQuery('');
-    setActiveCategory('all');
+    setSelectedDomain('all');
     setSelectedSalaryBand(null);
-  };
-
-  const handleApplySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!applyForm.studentEmail) return;
-
-    setIsSubmitting(true);
-    try {
-      await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: applyForm.fullName || `Candidate (${applyForm.rollNumber})`,
-          email: applyForm.studentEmail,
-          phone: applyForm.phone || 'N/A',
-          source: `Placement Drive: ${selectedApplyDrive?.companyName} - ${selectedApplyDrive?.title}`,
-          college: applyForm.rollNumber || 'Enrolled Student',
-          notes: `Applied for drive ${selectedApplyDrive?.id} (${selectedApplyDrive?.title}) at ${selectedApplyDrive?.companyName}. Degree: ${applyForm.degree || 'N/A'}, CGPA: ${applyForm.cgpa || 'N/A'}`
-        })
-      });
-
-      setApplySuccess(true);
-      setTimeout(() => {
-        setApplySuccess(false);
-        setSelectedApplyDrive(null);
-        setApplyForm({
-          rollNumber: '',
-          studentEmail: '',
-          fullName: '',
-          phone: '',
-          degree: '',
-          branch: '',
-          cgpa: ''
-        });
-      }, 2500);
-    } catch (err) {
-      console.error('Error submitting application:', err);
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const navigateTo = (path: string) => {
@@ -247,6 +225,20 @@ export default function PublicUpcomingDrivesPage({
               <p className="text-sm sm:text-base text-slate-600 max-w-3xl leading-relaxed">
                 {heroContent.subtitle || "Explore verified campus and pooled hiring drives. Check eligibility, review test dates, and apply for free with zero intermediary fees."}
               </p>
+              <div className="pt-2 flex items-center gap-3">
+                <a
+                  href="#/register-for-free"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.location.hash = '#/register-for-free';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-[#80d64b]" />
+                  <span>Register for Free Candidate Pool</span>
+                </a>
+              </div>
             </div>
 
             {/* Quick Summary Snapshot Card */}
@@ -293,181 +285,244 @@ export default function PublicUpcomingDrivesPage({
 
       {/* 3. Filter & Discovery Command Center */}
       <section className="w-full bg-[#f7f9fd] py-8 border-b border-[#e0e2e6]">
-        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-6">
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-5">
           
-          {/* Search Input & Category Pills */}
-          <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-2xl">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
-              <input
-                id="driveSearchInput"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by company, role, or required skill..."
-                className="w-full bg-white border border-[#e0e2e6] pl-11 pr-4 py-3 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-slate-800 transition-colors shadow-sm"
-              />
-              {searchQuery && (
+          {/* Top Search Bar */}
+          <div className="relative w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
+            <input
+              id="driveSearchInput"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by company, role, skills, degree, or domain..."
+              className="w-full bg-white border border-[#e0e2e6] pl-11 pr-10 py-3 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-slate-800 transition-colors shadow-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Domain / Career Stream Filter Bar */}
+          <div className="p-4 bg-white border border-[#e0e2e6] rounded-2xl shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs uppercase tracking-wider text-slate-900 font-extrabold">
+                  Filter by Career Stream / Academic Domain
+                </span>
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
+                  {PREDEFINED_DOMAINS.length} Streams
+                </span>
+              </div>
+              {selectedDomain !== 'all' && (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  type="button"
+                  onClick={() => setSelectedDomain('all')}
+                  className="text-[11px] text-blue-600 hover:underline font-bold flex items-center gap-1 self-start sm:self-auto"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
+                  <span>Show All Domains</span>
                 </button>
               )}
             </div>
 
-            {/* Category Segment Buttons */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Predefined Domain Filter Pills */}
+            <div className="flex flex-wrap items-center gap-2 pt-1" id="domainFilterPills">
+              {/* All Domains Pill */}
               <button
-                onClick={() => setActiveCategory('all')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                  activeCategory === 'all'
-                    ? 'bg-slate-900 text-white shadow-slate-900/10'
-                    : 'bg-white border border-[#e0e2e6] text-slate-700 hover:border-slate-900'
+                type="button"
+                onClick={() => setSelectedDomain('all')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+                  selectedDomain === 'all'
+                    ? 'bg-slate-900 text-white shadow-slate-900/10 ring-2 ring-slate-900/10'
+                    : 'bg-[#f7f9fd] border border-[#e0e2e6] text-slate-700 hover:border-slate-800 hover:bg-white'
                 }`}
               >
-                All Drives ({drives.length})
+                <span>All Career Domains</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                  selectedDomain === 'all' ? 'bg-emerald-400 text-slate-950 font-black' : 'bg-slate-200 text-slate-700 font-bold'
+                }`}>
+                  {domainCounts['all'] || 0}
+                </span>
               </button>
-              <button
-                onClick={() => setActiveCategory('it')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                  activeCategory === 'it'
-                    ? 'bg-slate-900 text-white shadow-slate-900/10'
-                    : 'bg-white border border-[#e0e2e6] text-slate-700 hover:border-slate-900'
-                }`}
-              >
-                IT & Software {itCount > 0 ? `(${itCount})` : ''}
-              </button>
-              <button
-                onClick={() => setActiveCategory('core')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                  activeCategory === 'core'
-                    ? 'bg-slate-900 text-white shadow-slate-900/10'
-                    : 'bg-white border border-[#e0e2e6] text-slate-700 hover:border-slate-900'
-                }`}
-              >
-                Core Engineering {coreCount > 0 ? `(${coreCount})` : ''}
-              </button>
-              <button
-                onClick={() => setActiveCategory('product')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                  activeCategory === 'product'
-                    ? 'bg-slate-900 text-white shadow-slate-900/10'
-                    : 'bg-white border border-[#e0e2e6] text-slate-700 hover:border-slate-900'
-                }`}
-              >
-                Product Companies {productCount > 0 ? `(${productCount})` : ''}
-              </button>
+
+              {/* Predefined Domains List */}
+              {PREDEFINED_DOMAINS.map(dom => {
+                const isSelected = selectedDomain === dom.id;
+                const count = domainCounts[dom.id] || 0;
+                return (
+                  <button
+                    key={dom.id}
+                    type="button"
+                    onClick={() => setSelectedDomain(isSelected ? 'all' : dom.id)}
+                    title={dom.description}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-slate-900 text-white shadow-slate-900/10 ring-2 ring-slate-900/10'
+                        : 'bg-[#f7f9fd] border border-[#e0e2e6] text-slate-700 hover:border-slate-800 hover:bg-white'
+                    }`}
+                  >
+                    <span>{dom.shortLabel}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      isSelected 
+                        ? 'bg-emerald-400 text-slate-950 font-black' 
+                        : count > 0 ? 'bg-slate-200 text-slate-800 font-bold' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Standardized Salary Bands Key */}
-          <div className="p-4 bg-white border border-[#e0e2e6] rounded-2xl shadow-sm">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+          {/* Standardized Salary Bands Key & Filter */}
+          <div className="p-4 bg-white border border-[#e0e2e6] rounded-2xl shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-slate-500" />
+                <Briefcase className="w-4 h-4 text-slate-600" />
                 <span className="text-xs uppercase tracking-wider text-slate-900 font-extrabold">
                   {salaryContent.sectionTitle || "Standardized Salary Bands"}
                 </span>
-                {selectedSalaryBand && (
-                  <button 
-                    onClick={() => setSelectedSalaryBand(null)}
-                    className="text-[11px] text-blue-600 hover:underline font-semibold ml-2"
+                <span className="text-[10px] text-slate-500 font-medium">
+                  • Click any band to filter drives
+                </span>
+              </div>
+              {selectedSalaryBand && (
+                <button 
+                  type="button"
+                  onClick={() => setSelectedSalaryBand(null)}
+                  className="text-[11px] text-blue-600 hover:underline font-bold flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Clear Band Filter</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {STANDARDIZED_SALARY_BANDS.map(band => {
+                const isSelected = selectedSalaryBand === band.id;
+                const count = salaryBandCounts[band.id] || 0;
+                
+                // Color configuration per band
+                let dotBg = 'bg-slate-400';
+                let activeClasses = 'bg-blue-50 border-blue-600 ring-2 ring-blue-500/20 text-blue-950';
+                if (band.id === 'Category B') {
+                  dotBg = 'bg-blue-500';
+                  activeClasses = 'bg-blue-50 border-blue-600 ring-2 ring-blue-500/20 text-blue-950';
+                } else if (band.id === 'Category C') {
+                  dotBg = 'bg-emerald-500';
+                  activeClasses = 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-500/20 text-emerald-950';
+                } else if (band.id === 'Category D') {
+                  dotBg = 'bg-purple-500';
+                  activeClasses = 'bg-slate-900 border-slate-900 ring-2 ring-slate-900/20 text-white';
+                }
+
+                return (
+                  <button
+                    key={band.id}
+                    type="button"
+                    onClick={() => setSelectedSalaryBand(isSelected ? null : band.id)}
+                    className={`p-3 rounded-xl border text-left flex items-center justify-between gap-2 transition-all cursor-pointer shadow-sm ${
+                      isSelected
+                        ? activeClasses
+                        : 'bg-[#f7f9fd] border-[#e0e2e6] hover:border-slate-400 hover:bg-white text-slate-800'
+                    }`}
                   >
-                    Clear Filter
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotBg}`} />
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-[11px] font-extrabold truncate ${isSelected && band.id === 'Category D' ? 'text-white' : 'text-slate-900'}`}>
+                          {band.label}
+                        </span>
+                        <span className={`text-[10px] truncate ${isSelected && band.id === 'Category D' ? 'text-slate-300' : 'text-slate-500'}`}>
+                          {band.range}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono shrink-0 ${
+                      isSelected
+                        ? (band.id === 'Category D' ? 'bg-emerald-400 text-slate-950 font-black' : 'bg-white border border-slate-300 text-slate-900 font-black shadow-xs')
+                        : count > 0 ? 'bg-slate-200 text-slate-700 font-bold' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {count}
+                    </span>
                   </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Filter Summary Bar (if any filter is engaged) */}
+          {(selectedDomain !== 'all' || selectedSalaryBand !== null || searchQuery.trim()) && (
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl text-xs shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-emerald-400" />
+                  Active Filters:
+                </span>
+
+                {/* Domain Chip */}
+                {selectedDomain !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 text-emerald-300 border border-slate-700 font-semibold">
+                    <span>Domain: {PREDEFINED_DOMAINS.find(d => d.id === selectedDomain)?.shortLabel || selectedDomain}</span>
+                    <button 
+                      onClick={() => setSelectedDomain('all')} 
+                      className="hover:text-white p-0.5" 
+                      title="Clear domain filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {/* Salary Band Chip */}
+                {selectedSalaryBand && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 text-blue-300 border border-slate-700 font-semibold">
+                    <span>Band: {selectedSalaryBand}</span>
+                    <button 
+                      onClick={() => setSelectedSalaryBand(null)} 
+                      className="hover:text-white p-0.5" 
+                      title="Clear salary band filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {/* Search Query Chip */}
+                {searchQuery.trim() && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 text-amber-300 border border-slate-700 font-semibold">
+                    <span>Search: "{searchQuery}"</span>
+                    <button 
+                      onClick={() => setSearchQuery('')} 
+                      className="hover:text-white p-0.5" 
+                      title="Clear search query"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto">
-                {/* Category A */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedSalaryBand(selectedSalaryBand === 'Category A' ? null : 'Category A')}
-                  className={`px-3 py-1.5 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
-                    selectedSalaryBand === 'Category A'
-                      ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-500/20'
-                      : 'bg-[#f7f9fd] border-[#e0e2e6] hover:border-slate-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-extrabold text-slate-900">
-                      {salaryContent.bandATitle || "Category A"}
-                    </span>
-                    <span className="text-[10px] text-slate-500">
-                      {salaryContent.bandARange || "Up to ₹4 LPA"}
-                    </span>
-                  </div>
-                </button>
-
-                {/* Category B */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedSalaryBand(selectedSalaryBand === 'Category B' ? null : 'Category B')}
-                  className={`px-3 py-1.5 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
-                    selectedSalaryBand === 'Category B'
-                      ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-500/20'
-                      : 'bg-[#f7f9fd] border-[#e0e2e6] hover:border-slate-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-extrabold text-slate-900">
-                      {salaryContent.bandBTitle || "Category B"}
-                    </span>
-                    <span className="text-[10px] text-slate-500">
-                      {salaryContent.bandBRange || "Up to ₹6 LPA"}
-                    </span>
-                  </div>
-                </button>
-
-                {/* Category C */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedSalaryBand(selectedSalaryBand === 'Category C' ? null : 'Category C')}
-                  className={`px-3 py-1.5 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
-                    selectedSalaryBand === 'Category C'
-                      ? 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-500/20'
-                      : 'bg-[#f7f9fd] border-[#e0e2e6] hover:border-slate-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#80d64b] shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-extrabold text-slate-900">
-                      {salaryContent.bandCTitle || "Category C"}
-                    </span>
-                    <span className="text-[10px] text-slate-500">
-                      {salaryContent.bandCRange || "Up to ₹9 LPA"}
-                    </span>
-                  </div>
-                </button>
-
-                {/* Category D */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedSalaryBand(selectedSalaryBand === 'Category D' ? null : 'Category D')}
-                  className={`px-3 py-1.5 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
-                    selectedSalaryBand === 'Category D'
-                      ? 'bg-slate-900 border-slate-900 ring-2 ring-slate-900/20 text-white'
-                      : 'bg-slate-900 border-slate-900 text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#80d64b] shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-extrabold text-white">
-                      {salaryContent.bandDTitle || "Category D"}
-                    </span>
-                    <span className="text-[10px] text-slate-300">
-                      {salaryContent.bandDRange || "Dream (₹9+ LPA)"}
-                    </span>
-                  </div>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="text-[11px] text-slate-300 hover:text-white font-bold underline cursor-pointer"
+              >
+                Reset All Filters
+              </button>
             </div>
-          </div>
+          )}
+
         </div>
       </section>
 
@@ -490,18 +545,24 @@ export default function PublicUpcomingDrivesPage({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="drivesGrid">
               {filteredDrives.map((drive) => {
                 const isDream = drive.salaryBand === 'Category D';
+                const isExpired = isDriveExpired(drive);
+                const skillsList = drive.skills
+                  ? drive.skills.split(/[,•|]/).map(s => s.trim()).filter(Boolean)
+                  : [];
                 return (
                   <article
                     key={drive.id}
-                    className="drive-card flex flex-col bg-white border border-[#e0e2e6] hover:border-slate-800 rounded-2xl transition-all duration-200 shadow-sm hover:shadow-md overflow-hidden group"
+                    className={`drive-card flex flex-col bg-white border rounded-2xl transition-all duration-200 shadow-sm hover:shadow-md overflow-hidden group ${
+                      isExpired ? 'border-slate-300 opacity-90' : 'border-[#e0e2e6] hover:border-slate-800'
+                    }`}
                   >
                     <div className="p-6 flex-1 flex flex-col justify-between">
                       <div>
                         {/* Header Row: Logo/Shortcode + Company Name + Category Pill */}
                         <div className="flex items-start justify-between gap-3 mb-4">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
                             {/* Logo or ShortCode Avatar */}
-                            <div className="w-12 h-12 bg-[#eceef2] rounded-xl border border-[#e0e2e6] flex items-center justify-center font-bold text-slate-900 text-sm overflow-hidden shrink-0">
+                            <div className="w-12 h-12 bg-[#eceef2] rounded-xl border border-[#e0e2e6] flex items-center justify-center font-bold text-slate-900 text-sm overflow-hidden shrink-0 mt-0.5">
                               {drive.companyLogo ? (
                                 <img 
                                   src={drive.companyLogo} 
@@ -517,30 +578,57 @@ export default function PublicUpcomingDrivesPage({
                               )}
                             </div>
 
-                            <div className="flex flex-col">
-                              <h3 className="font-extrabold text-base text-slate-900 tracking-tight leading-snug group-hover:text-blue-600 transition-colors">
-                                {drive.companyName}
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <h3 className="font-extrabold text-base text-slate-900 tracking-tight leading-snug group-hover:text-blue-600 transition-colors truncate">
+                                <a 
+                                  href={`#/drive/${getDriveSlug(drive)}`}
+                                  onClick={() => {
+                                    window.location.hash = `#/drive/${getDriveSlug(drive)}`;
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className="hover:underline"
+                                >
+                                  {drive.companyName || 'Corporate Partner'}
+                                </a>
                               </h3>
-                              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                {drive.categoryLabel || drive.skills || 'Enterprise Technology'}
+                              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">
+                                {drive.domainLabel || drive.categoryLabel || (drive.category === 'core' ? 'Core Engineering' : drive.category === 'product' ? 'Product Engineering' : 'Enterprise Technology')}
                               </p>
                             </div>
                           </div>
 
-                          {/* Salary Band Pill */}
-                          <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border tracking-wide uppercase shrink-0 ${
-                            isDream 
-                              ? 'bg-slate-900 text-white border-slate-900' 
-                              : 'bg-[#eceef2] border-[#e0e2e6] text-slate-800'
-                          }`}>
-                            {drive.salaryBand || 'Category B'}
-                          </span>
+                          {/* Salary Band Pill (Explicit or Auto-Detected) */}
+                          {(() => {
+                            const displayedBand = drive.salaryBand || (
+                              STANDARDIZED_SALARY_BANDS.find(b => matchesDriveSalaryBand(drive, b.id))?.label
+                            );
+                            if (!displayedBand) return null;
+                            const isDreamBand = displayedBand === 'Category D';
+                            return (
+                              <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border tracking-wide uppercase shrink-0 ${
+                                isDreamBand 
+                                  ? 'bg-slate-900 text-white border-slate-900' 
+                                  : 'bg-[#eceef2] border-[#e0e2e6] text-slate-800'
+                              }`}>
+                                {displayedBand}
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         {/* Role & CTC Focus */}
                         <div className="mb-5 pb-4 border-b border-[#e0e2e6]">
                           <h4 className="text-lg font-extrabold text-slate-900 mb-1 leading-snug">
-                            {drive.title}
+                            <a 
+                              href={`#/drive/${getDriveSlug(drive)}`}
+                              onClick={() => {
+                                window.location.hash = `#/drive/${getDriveSlug(drive)}`;
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="hover:text-blue-600 transition-colors"
+                            >
+                              {drive.title}
+                            </a>
                           </h4>
                           <div className="flex items-baseline gap-2">
                             <span className="text-base font-extrabold text-[#2e6c00]">
@@ -553,7 +641,7 @@ export default function PublicUpcomingDrivesPage({
                         </div>
 
                         {/* Matrix Metadata */}
-                        <div className="space-y-3 mb-6 text-xs">
+                        <div className="space-y-3 mb-4 text-xs">
                           {/* Eligible Batch */}
                           <div className="flex items-start gap-2.5">
                             <School className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
@@ -562,7 +650,7 @@ export default function PublicUpcomingDrivesPage({
                                 Eligible Batch
                               </span>
                               <span className="font-bold text-slate-800 text-xs">
-                                {drive.eligibleBatch || '2024 & 2025 Passing Out'}
+                                {drive.eligibleBatch || '2025 & 2026 Passing Out'}
                               </span>
                               <span className="text-[11px] text-slate-500 block">
                                 {drive.batchSubtext || drive.eligibleDegree || 'BE / B.Tech / MCA'}
@@ -607,42 +695,101 @@ export default function PublicUpcomingDrivesPage({
                               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
                                 Application Deadline
                               </span>
-                              <span className="font-bold text-red-600 text-xs">
-                                {drive.deadline || 'Closing Soon'}
-                              </span>
+                              {isExpired ? (
+                                <span className="font-bold text-slate-500 text-xs">
+                                  {drive.deadline ? `${drive.deadline} (Closed)` : 'Drive Concluded'}
+                                </span>
+                              ) : (
+                                <span className="font-bold text-red-600 text-xs">
+                                  {drive.deadline || 'Closing Soon'}
+                                </span>
+                              )}
                             </div>
                           </div>
+
+                          {/* Compact Skills Preview (Max 2 tags + more badge) */}
+                          {skillsList.length > 0 && (
+                            <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mr-0.5">
+                                Skills:
+                              </span>
+                              {skillsList.slice(0, 2).map((skill, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-semibold rounded-md border border-slate-200 truncate max-w-[130px]"
+                                  title={skill}
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                              {skillsList.length > 2 && (
+                                <a
+                                  href={`#/drive/${getDriveSlug(drive)}`}
+                                  onClick={() => {
+                                    window.location.hash = `#/drive/${getDriveSlug(drive)}`;
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className="px-1.5 py-0.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold rounded-md border border-slate-200 transition-colors cursor-pointer"
+                                  title={skillsList.slice(2).join(', ')}
+                                >
+                                  +{skillsList.length - 2} more
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       {/* Card Bottom Bar */}
                       <div className="pt-4 border-t border-[#e0e2e6] flex flex-col gap-3">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#f7f9fd] rounded-lg text-slate-800 font-bold text-[11px] border border-[#e0e2e6]">
-                            <span className="w-2 h-2 rounded-full bg-[#80d64b]"></span>
-                            {drive.statusBadge || 'Applications Open'}
-                          </span>
+                          {isExpired ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-lg text-slate-600 font-bold text-[11px] border border-slate-300">
+                              <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                              Applications Closed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#f7f9fd] rounded-lg text-slate-800 font-bold text-[11px] border border-[#e0e2e6]">
+                              <span className="w-2 h-2 rounded-full bg-[#80d64b]"></span>
+                              {drive.statusBadge || 'Applications Open'}
+                            </span>
+                          )}
                           <span className="text-[11px] font-medium text-slate-500">
-                            {drive.statusSubtext || 'No Registration Charges'}
+                            {isExpired ? 'Drive Concluded' : (drive.statusSubtext || 'No Registration Charges')}
                           </span>
                         </div>
 
                         {/* Action Buttons */}
                         <div className="grid grid-cols-2 gap-2 mt-1">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDetailDrive(drive)}
-                            className="px-3 py-2.5 bg-white border border-[#e0e2e6] hover:border-slate-800 text-slate-900 rounded-xl text-xs font-bold text-center transition-all cursor-pointer shadow-xs"
+                          <a
+                            href={`#/drive/${getDriveSlug(drive)}`}
+                            onClick={() => {
+                              window.location.hash = `#/drive/${getDriveSlug(drive)}`;
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="px-3 py-2.5 bg-white border border-[#e0e2e6] hover:border-slate-800 text-slate-900 rounded-xl text-xs font-bold text-center transition-all cursor-pointer shadow-xs truncate block"
                           >
                             View Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedApplyDrive(drive)}
-                            className="px-3 py-2.5 bg-[#80d64b] hover:bg-[#85dc50] text-[#092100] rounded-xl text-xs font-extrabold text-center transition-all cursor-pointer shadow-xs hover:shadow"
-                          >
-                            Apply Now
-                          </button>
+                          </a>
+
+                          {isExpired ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="px-3 py-2.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl text-xs font-bold text-center cursor-not-allowed select-none truncate"
+                              title="Applications for this drive have concluded"
+                            >
+                              Closed
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedApplyDrive(drive)}
+                              className="px-3 py-2.5 bg-[#80d64b] hover:bg-[#85dc50] text-[#092100] rounded-xl text-xs font-extrabold text-center transition-all cursor-pointer shadow-xs hover:shadow truncate"
+                            >
+                              Apply Now
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -737,6 +884,18 @@ export default function PublicUpcomingDrivesPage({
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
+              <a
+                href="#/register-for-free"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.hash = '#/register-for-free';
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3.5 bg-[#80d64b] hover:bg-[#72c242] text-[#092100] text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer gap-2"
+              >
+                <UserPlus className="w-4 h-4 text-[#092100]" />
+                <span>Register for Free</span>
+              </a>
               <button
                 type="button"
                 onClick={() => navigateTo(ctaContent.primaryBtnLink || 'contact')}
@@ -760,265 +919,25 @@ export default function PublicUpcomingDrivesPage({
 
       {/* 7. Detailed Modal for View Details */}
       {selectedDetailDrive && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#e0e2e6] max-w-xl w-full rounded-2xl p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => setSelectedDetailDrive(null)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 bg-[#80d64b] text-[#092100] font-extrabold rounded-md">
-                Verified Corporate Drive
-              </span>
-              <span className="text-xs text-slate-500 font-semibold">100% Free Application</span>
-            </div>
-
-            <h3 className="text-2xl font-black text-slate-900 leading-tight">
-              {selectedDetailDrive.companyName}
-            </h3>
-            <p className="text-sm font-bold text-blue-600 mt-1 mb-4">
-              {selectedDetailDrive.title} • {selectedDetailDrive.salary}
-            </p>
-
-            <div className="bg-[#f7f9fd] border border-[#e0e2e6] p-4 rounded-xl mb-5 space-y-2.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Industry Track:</span>
-                <span className="font-bold text-slate-800">{selectedDetailDrive.categoryLabel || 'Enterprise Engineering'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Eligible Batch:</span>
-                <span className="font-bold text-slate-800">{selectedDetailDrive.eligibleBatch || '2024 & 2025'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Degree Criteria:</span>
-                <span className="font-bold text-slate-800">{selectedDetailDrive.eligibleDegree || 'BE / B.Tech / MCA'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Academic Threshold:</span>
-                <span className="font-bold text-slate-800">{selectedDetailDrive.minCgpa || '6.0 CGPA Minimum'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Job Location:</span>
-                <span className="font-bold text-slate-800">{selectedDetailDrive.location || 'PAN India'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Application Deadline:</span>
-                <span className="font-extrabold text-red-600">{selectedDetailDrive.deadline || 'Closing Soon'}</span>
-              </div>
-            </div>
-
-            {selectedDetailDrive.description && (
-              <div className="mb-5 text-xs text-slate-600 leading-relaxed">
-                <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider mb-1.5">Role Overview</h4>
-                <p>{selectedDetailDrive.description}</p>
-              </div>
-            )}
-
-            {selectedDetailDrive.skills && (
-              <div className="mb-6">
-                <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider mb-2">Evaluated Technical Skills</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedDetailDrive.skills.split(',').map((skill, idx) => (
-                    <span key={idx} className="px-2.5 py-1 bg-[#eceef2] text-slate-800 text-[11px] font-semibold rounded-lg border border-[#e0e2e6]">
-                      {skill.trim()}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#e0e2e6]">
-              <button
-                type="button"
-                onClick={() => setSelectedDetailDrive(null)}
-                className="px-4 py-2.5 border border-[#e0e2e6] hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-colors"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const d = selectedDetailDrive;
-                  setSelectedDetailDrive(null);
-                  setSelectedApplyDrive(d);
-                }}
-                className="px-5 py-2.5 bg-[#80d64b] hover:bg-[#85dc50] text-[#092100] rounded-xl text-xs font-extrabold transition-all shadow-xs"
-              >
-                Apply for this Drive
-              </button>
-            </div>
-          </div>
-        </div>
+        <DriveDetailsModal
+          drive={selectedDetailDrive}
+          onClose={() => setSelectedDetailDrive(null)}
+          onApply={(d) => {
+            setSelectedDetailDrive(null);
+            setSelectedApplyDrive(d);
+          }}
+        />
       )}
 
-      {/* 8. Detailed Modal for TantraPex Direct Apply */}
+      {/* 8. Dynamic Application Modal (Admin Form Builder & Google Form Connected) */}
       {selectedApplyDrive && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#e0e2e6] max-w-xl w-full rounded-2xl p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => setSelectedApplyDrive(null)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {applySuccess ? (
-              <div className="py-8 text-center space-y-3">
-                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center">
-                  <CheckCircle2 className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-black text-slate-900">Application Submitted Successfully!</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                  Your academic dossier for <strong>{selectedApplyDrive.companyName} ({selectedApplyDrive.title})</strong> has been registered with TantraPex Placement Cell. Our coordinator will review your eligibility and dispatch next steps to your registered email.
-                </p>
-                <div className="pt-2">
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                    Zero Fee Guarantee Verified
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 bg-[#80d64b] text-[#092100] font-extrabold rounded-md">
-                    TantraPex Direct Apply
-                  </span>
-                  <span className="text-xs text-slate-500 font-semibold">100% Free Application</span>
-                </div>
-
-                <h3 className="text-2xl font-black text-slate-900 leading-tight">
-                  {selectedApplyDrive.companyName}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 mb-4">
-                  Applying for <strong>{selectedApplyDrive.title}</strong> • Package: {selectedApplyDrive.salary}
-                </p>
-
-                {/* Verification Notice */}
-                <div className="bg-[#f7f9fd] border border-[#e0e2e6] p-4 rounded-xl mb-5 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Fee Requirement:</span>
-                    <span className="font-extrabold text-[#2e6c00]">₹0 (Zero Charges)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Application Mode:</span>
-                    <span className="font-bold text-slate-800">Online Evaluation + Corporate Portal</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Verification SLA:</span>
-                    <span className="font-bold text-slate-800">Instant Eligibility Stamp</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleApplySubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">Full Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={applyForm.fullName}
-                        onChange={(e) => setApplyForm({ ...applyForm, fullName: e.target.value })}
-                        placeholder="e.g. Rahul Sharma"
-                        className="w-full bg-[#f7f9fd] border border-[#e0e2e6] px-3 py-2 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">WhatsApp / Mobile *</label>
-                      <input
-                        type="tel"
-                        required
-                        value={applyForm.phone}
-                        onChange={(e) => setApplyForm({ ...applyForm, phone: e.target.value })}
-                        placeholder="10-digit mobile number"
-                        className="w-full bg-[#f7f9fd] border border-[#e0e2e6] px-3 py-2 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">Roll / Registration Number *</label>
-                      <input
-                        type="text"
-                        required
-                        value={applyForm.rollNumber}
-                        onChange={(e) => setApplyForm({ ...applyForm, rollNumber: e.target.value })}
-                        placeholder="e.g. 21BCE10482"
-                        className="w-full bg-[#f7f9fd] border border-[#e0e2e6] px-3 py-2 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">College Email Address *</label>
-                      <input
-                        type="email"
-                        required
-                        value={applyForm.studentEmail}
-                        onChange={(e) => setApplyForm({ ...applyForm, studentEmail: e.target.value })}
-                        placeholder="student@institution.ac.in"
-                        className="w-full bg-[#f7f9fd] border border-[#e0e2e6] px-3 py-2 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">Degree & Branch</label>
-                      <input
-                        type="text"
-                        value={applyForm.degree}
-                        onChange={(e) => setApplyForm({ ...applyForm, degree: e.target.value })}
-                        placeholder="e.g. B.Tech CSE (2024)"
-                        className="w-full bg-[#f7f9fd] border border-[#e0e2e6] px-3 py-2 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">Graduation CGPA / Percentage</label>
-                      <input
-                        type="text"
-                        value={applyForm.cgpa}
-                        onChange={(e) => setApplyForm({ ...applyForm, cgpa: e.target.value })}
-                        placeholder="e.g. 7.8 CGPA"
-                        className="w-full bg-[#f7f9fd] border border-[#e0e2e6] px-3 py-2 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#e0e2e6]">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedApplyDrive(null)}
-                      className="px-4 py-2.5 border border-[#e0e2e6] hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="px-6 py-2.5 bg-[#80d64b] hover:bg-[#85dc50] text-[#092100] rounded-xl text-xs font-extrabold transition-all shadow-xs cursor-pointer flex items-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Verifying Eligibility...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Confirm & Proceed to Drive</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-          </div>
-        </div>
+        <DriveApplicationModal
+          drive={selectedApplyDrive}
+          onClose={() => setSelectedApplyDrive(null)}
+          onApplicationSuccess={(refId) => {
+            console.log('Application submitted successfully with Reference ID:', refId);
+          }}
+        />
       )}
 
     </div>

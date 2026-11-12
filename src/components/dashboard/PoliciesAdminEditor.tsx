@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { GlobalSettings, PoliciesConfig, PolicyDocument, PolicySectionItem } from '../../types';
 import { DEFAULT_POLICIES_CONFIG } from '../../lib/defaultPolicies';
-import { 
-  ShieldCheck, Lock, FileText, AlertTriangle, RefreshCw, Plus, Trash2, 
-  ArrowUp, ArrowDown, Check, Save, RotateCcw, ExternalLink, Mail, Info, CheckCircle2 
+import {
+  ShieldCheck, Lock, FileText, AlertTriangle, RefreshCw, Plus, Trash2,
+  ArrowUp, ArrowDown, Check, Save, RotateCcw, ExternalLink, Mail, Info, CheckCircle2
 } from 'lucide-react';
 
 interface PoliciesAdminEditorProps {
@@ -233,11 +233,10 @@ export default function PoliciesAdminEditor({ settings, setSettings }: PoliciesA
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 min-w-[180px] flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                isActive
+              className={`flex-1 min-w-[180px] flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${isActive
                   ? 'bg-[#071B4D] text-white shadow-md'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2.5">
                 <TabIcon className={`h-4 w-4 ${isActive ? 'text-[#F7C400]' : tab.color}`} />
@@ -325,7 +324,7 @@ export default function PoliciesAdminEditor({ settings, setSettings }: PoliciesA
               type="email"
               value={currentDoc.contactEmail1 || ''}
               onChange={(e) => updateCurrentDoc({ ...currentDoc, contactEmail1: e.target.value })}
-              placeholder="e.g. info@tantrapex.com"
+              placeholder="e.g. Contact@tantrapex.com"
               className="px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

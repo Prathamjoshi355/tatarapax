@@ -1,163 +1,35 @@
 import { PlacementDrive, CMSSection } from '../types';
 
-export const DEFAULT_PLACEMENT_DRIVES_LIST: PlacementDrive[] = [
-  {
-    id: 'drv-ltts-01',
-    companyId: 'hp-ltts',
-    companyName: 'L&T Technology Services',
-    companyLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1792083463/ltts_logo_p5y7.png',
-    shortCode: 'LTTS',
-    category: 'core',
-    categoryLabel: 'Core Engineering',
-    salaryBand: 'Category B',
-    title: 'Graduate Trainee Engineer',
-    salary: '₹4.80 LPA',
-    salarySubtext: 'Fixed Annual CTC',
-    eligibleBatch: '2024 & 2025 Passing Out',
-    eligibleDegree: 'BE / B.Tech (ECE, EEE, Mechanical, CSE)',
-    batchSubtext: 'BE / B.Tech (ECE, EEE, Mechanical, CSE)',
-    minCgpa: '6.5 or 65% throughout',
-    location: 'PAN India / Bengaluru / Pune',
-    deadline: '2024-11-28',
-    statusBadge: 'Applications Open',
-    statusSubtext: 'No Registration Charges',
-    status: 'published',
-    driveType: 'off-campus',
-    skills: 'Embedded C, MATLAB, Electronics, CAD, Automotive',
-    description: 'Direct corporate intake for engineering graduates into L&T Technology Services R&D design and engineering programs.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'drv-capg-02',
-    companyId: 'hp-capgemini',
-    companyName: 'Capgemini',
-    companyLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1792083454/capgemini_logo_p5y7.png',
-    shortCode: 'CAP',
-    category: 'it',
-    categoryLabel: 'IT Services',
-    salaryBand: 'Category B',
-    title: 'Software Engineer Trainee',
-    salary: '₹5.75 LPA',
-    salarySubtext: 'Annual Package',
-    eligibleBatch: '2024 Passing Out',
-    eligibleDegree: 'B.Tech, BE, MCA',
-    batchSubtext: 'B.Tech, BE, MCA',
-    minCgpa: '6.0 CGPA Minimum',
-    location: 'Bengaluru, Pune, Hyderabad',
-    deadline: '2024-12-05',
-    statusBadge: 'Applications Open',
-    statusSubtext: 'Direct Corporate Call',
-    status: 'published',
-    driveType: 'off-campus',
-    skills: 'Java, Cloud, Spring Boot, Web Technologies, SQL',
-    description: 'Capgemini Exceller recruitment drive for software engineering graduates across enterprise cloud and applications tracks.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'drv-cts-03',
-    companyId: 'hp-cognizant',
-    companyName: 'Cognizant (CTS)',
-    companyLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1792083482/cognizant_logo_p5y7.png',
-    shortCode: 'CTS',
-    category: 'it',
-    categoryLabel: 'IT Services',
-    salaryBand: 'Category B',
-    title: 'GenC Next Associate',
-    salary: '₹4.50 LPA',
-    salarySubtext: 'Annual Package',
-    eligibleBatch: '2024 & 2025 Passing Out',
-    eligibleDegree: 'B.Tech, BCA, MCA',
-    batchSubtext: 'B.Tech, BCA, MCA',
-    minCgpa: '6.0 CGPA Minimum',
-    location: 'Chennai, Bengaluru, Kolkata',
-    deadline: '2024-12-12',
-    statusBadge: 'Applications Open',
-    statusSubtext: 'Free Verification',
-    status: 'published',
-    driveType: 'off-campus',
-    skills: 'Python, Java, Full Stack Development, DSA, Cloud',
-    description: 'Cognizant GenC Next drive targeting top academic and skill-tested performers for next-gen digital transformation roles.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'drv-zoho-04',
-    companyId: 'hp-zoho',
-    companyName: 'Zoho Corporation',
-    companyLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1792085445/zoho_logo_p5y7.png',
-    shortCode: 'ZOHO',
-    category: 'product',
-    categoryLabel: 'Product',
-    salaryBand: 'Category C',
-    title: 'Member Technical Staff',
-    salary: '₹5.60 – ₹8.40 LPA',
-    salarySubtext: 'Performance Driven',
-    eligibleBatch: 'Any Graduate / 2024 & 2025',
-    eligibleDegree: 'Open to All Engineering & Science streams',
-    batchSubtext: 'Open to All Engineering & Science streams',
-    minCgpa: 'No minimum cut-off (Skill-based test)',
-    location: 'Chennai, Tenkasi, Salem',
-    deadline: '2024-12-18',
-    statusBadge: 'Registrations Open',
-    statusSubtext: 'Zero Fees',
-    status: 'published',
-    driveType: 'off-campus',
-    skills: 'Data Structures, Problem Solving, Java, C++, Systems Programming',
-    description: 'Zoho direct hiring drive based purely on programming and algorithmic acumen without academic percentage barriers.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'drv-kpit-05',
-    companyId: 'hp-kpit',
-    companyName: 'KPIT Technologies',
-    companyLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1792086867/kpit_logo_p5y7.png',
-    shortCode: 'KPIT',
-    category: 'core',
-    categoryLabel: 'Core Engineering & Automotive',
-    salaryBand: 'Category B',
-    title: 'Embedded Automotive Engineer',
-    salary: '₹5.50 LPA',
-    salarySubtext: 'Annual CTC',
-    eligibleBatch: 'B.Tech (ECE, EEE, Instrumentation) 2024',
-    eligibleDegree: 'Automotive systems specialization',
-    batchSubtext: 'Automotive systems specialization',
-    minCgpa: '6.8 CGPA Minimum',
-    location: 'Pune, Bengaluru',
-    deadline: '2024-12-22',
-    statusBadge: 'Applications Open',
-    statusSubtext: 'Zero Intermediary Fees',
-    status: 'published',
-    driveType: 'off-campus',
-    skills: 'Embedded C, AUTOSAR, CAN Protocol, Automotive Software, RTOS',
-    description: 'KPIT PACE campus hiring drive recruiting embedded systems engineers for mobility software and autonomous platforms.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'drv-aws-06',
-    companyId: 'hp-aws',
-    companyName: 'Amazon Web Services',
-    companyLogo: 'https://res.cloudinary.com/dhy9pmo8s/image/upload/v1792085484/aws_logo_p5y7.png',
-    shortCode: 'AWS',
-    category: 'product',
-    categoryLabel: 'Cloud Infrastructure',
-    salaryBand: 'Category C',
-    title: 'Cloud Support Associate',
-    salary: '₹7.20 LPA',
-    salarySubtext: 'Base Package + Allowances',
-    eligibleBatch: '2024 Passing Out',
-    eligibleDegree: 'Circuit Branches / CSE / IT / ECE',
-    batchSubtext: 'Circuit Branches / CSE / IT / ECE',
-    minCgpa: '6.5 CGPA Minimum',
-    location: 'Hyderabad, Bengaluru',
-    deadline: '2024-12-27',
-    statusBadge: 'Applications Open',
-    statusSubtext: 'Verified Enterprise Drive',
-    status: 'published',
-    driveType: 'off-campus',
-    skills: 'Linux, Networking (TCP/IP), Cloud Computing, Python/Bash, Troubleshooting',
-    description: 'Amazon Web Services talent alliance drive seeking engineers to support mission-critical enterprise cloud architectures.',
-    createdAt: new Date().toISOString()
+/**
+ * Helper to determine whether a placement drive's application deadline has expired.
+ * Drives with expired deadlines are hidden from the Homepage, but remain visible
+ * on the Upcoming Placement Opportunities page with an "Applications Closed" badge.
+ */
+export function isDriveExpired(drive: { deadline?: string; status?: string } | null | undefined): boolean {
+  if (!drive) return false;
+  if (drive.status === 'closed' || drive.status === 'archived') return true;
+  if (!drive.deadline || drive.deadline.trim() === '') return false;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const cleanDeadline = drive.deadline.trim();
+
+  // If standard YYYY-MM-DD string
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDeadline)) {
+    return cleanDeadline < todayStr;
   }
-];
+
+  // Fallback timestamp parse
+  const deadlineTime = Date.parse(cleanDeadline);
+  if (!isNaN(deadlineTime)) {
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    return deadlineTime < todayMidnight.getTime();
+  }
+
+  return false;
+}
+
+export const DEFAULT_PLACEMENT_DRIVES_LIST: PlacementDrive[] = [];
 
 export const DEFAULT_UPCOMING_DRIVES_SECTIONS: CMSSection[] = [
   {
@@ -262,3 +134,227 @@ export const DEFAULT_UPCOMING_DRIVES_SECTIONS: CMSSection[] = [
     }
   }
 ];
+
+export interface DomainCategory {
+  id: string;
+  label: string;
+  shortLabel: string;
+  description: string;
+  keywords: string[];
+}
+
+export const PREDEFINED_DOMAINS: DomainCategory[] = [
+  {
+    id: 'it-software',
+    label: 'IT & Software Development',
+    shortLabel: 'IT & Software',
+    description: 'Software Engineering, Full-Stack, Backend, Frontend, Cloud & Mobile',
+    keywords: ['software', 'developer', 'sde', 'engineer', 'frontend', 'backend', 'full stack', 'fullstack', 'react', 'node', 'java', 'python', 'c++', 'web', 'it', 'cloud', 'aws', 'mobile', 'android', 'ios']
+  },
+  {
+    id: 'data-ai',
+    label: 'Data Science, Analytics & AI / ML',
+    shortLabel: 'Data & AI',
+    description: 'Data Scientist, Business Analyst, ML Engineer & Big Data',
+    keywords: ['data', 'analytics', 'analyst', 'ai', 'ml', 'machine learning', 'deep learning', 'sql', 'power bi', 'tableau', 'big data', 'nlp']
+  },
+  {
+    id: 'core-engineering',
+    label: 'Core Engineering (Mechanical / Civil / Electrical / ECE)',
+    shortLabel: 'Core Engineering',
+    description: 'Design, Production, VLSI, Embedded, Automation & Site Engineering',
+    keywords: ['mechanical', 'civil', 'electrical', 'electronics', 'ece', 'vlsi', 'embedded', 'cad', 'autocad', 'manufacturing', 'production', 'chemical', 'mechatronics']
+  },
+  {
+    id: 'product-qa',
+    label: 'Product Management & QA / Testing',
+    shortLabel: 'Product & QA',
+    description: 'Product Manager, QA Automation, SDET & Quality Assurance',
+    keywords: ['product', 'qa', 'testing', 'sdet', 'automation', 'manual testing', 'quality', 'selenium', 'jira']
+  },
+  {
+    id: 'sales-marketing',
+    label: 'Sales, Marketing & Business Development',
+    shortLabel: 'Sales & Marketing',
+    description: 'BDE, Inside Sales, Digital Marketing, SEO & Brand Management',
+    keywords: ['sales', 'marketing', 'bde', 'business development', 'digital marketing', 'lead', 'inside sales', 'growth', 'seo', 'advertising']
+  },
+  {
+    id: 'finance-consulting',
+    label: 'Finance, Banking & Management Consulting',
+    shortLabel: 'Finance & Consulting',
+    description: 'Financial Analyst, Audit, Accounts, Risk & Strategy Consulting',
+    keywords: ['finance', 'banking', 'account', 'audit', 'tax', 'consulting', 'financial', 'cfa', 'ca', 'wealth', 'investment']
+  },
+  {
+    id: 'operations-hr',
+    label: 'Operations, HR & Supply Chain',
+    shortLabel: 'Operations & HR',
+    description: 'HR Executive, Talent Acquisition, Operations & Supply Chain Logistics',
+    keywords: ['operations', 'hr', 'human resources', 'recruitment', 'recruiter', 'supply chain', 'logistics', 'admin', 'talent']
+  },
+  {
+    id: 'design-creative',
+    label: 'UI/UX Design & Creative Arts',
+    shortLabel: 'Design & UI/UX',
+    description: 'UI/UX Designer, Graphic Artist, Visual Communication & Content',
+    keywords: ['design', 'ui', 'ux', 'graphic', 'figma', 'creative', 'visual', 'illustrator', 'photoshop', 'animation']
+  },
+  {
+    id: 'customer-support',
+    label: 'Customer Success & Technical Support',
+    shortLabel: 'Support & Success',
+    description: 'Customer Support, Technical Service, Client Relations & CRM',
+    keywords: ['support', 'customer service', 'voice', 'non-voice', 'helpdesk', 'technical support', 'client support']
+  }
+];
+
+export interface StandardSalaryBand {
+  id: string; // 'Category A' | 'Category B' | 'Category C' | 'Category D'
+  label: string;
+  range: string;
+  minLpa: number;
+  maxLpa: number;
+}
+
+export const STANDARDIZED_SALARY_BANDS: StandardSalaryBand[] = [
+  { id: 'Category A', label: 'Category A', range: 'Up to ₹4 LPA', minLpa: 0, maxLpa: 4 },
+  { id: 'Category B', label: 'Category B', range: '₹4 - ₹6 LPA', minLpa: 4, maxLpa: 6 },
+  { id: 'Category C', label: 'Category C', range: '₹6 - ₹10 LPA', minLpa: 6, maxLpa: 10 },
+  { id: 'Category D', label: 'Category D', range: 'Dream (₹10+ LPA)', minLpa: 10, maxLpa: 999 }
+];
+
+/**
+ * Helper to match a drive against a selected domain filter.
+ * Checks explicit domain/category first, then smart keywords fallback.
+ */
+export function matchesDriveDomain(drive: PlacementDrive, domainId: string): boolean {
+  if (!domainId || domainId === 'all') return true;
+
+  // 1. Direct domain match
+  const dDomain = (drive.domain || '').toLowerCase().trim();
+  const dCategory = (drive.category || '').toLowerCase().trim();
+
+  if (dDomain === domainId) return true;
+  if (dCategory === domainId) return true;
+
+  // Legacy category mapping
+  if (domainId === 'it-software' && (dCategory === 'it' || dCategory === 'it-software')) return true;
+  if (domainId === 'core-engineering' && (dCategory === 'core' || dCategory === 'core-engineering')) return true;
+  if (domainId === 'product-qa' && (dCategory === 'product' || dCategory === 'product-qa')) return true;
+
+  // 2. Keyword fallback matching
+  const domainConfig = PREDEFINED_DOMAINS.find(d => d.id === domainId);
+  if (!domainConfig) return false;
+
+  const searchableText = `${drive.title || ''} ${drive.skills || ''} ${drive.description || ''} ${drive.eligibleDegree || ''} ${drive.categoryLabel || ''} ${drive.domainLabel || ''}`.toLowerCase();
+
+  return domainConfig.keywords.some(kw => searchableText.includes(kw));
+}
+
+/**
+ * Helper to extract numeric LPA value from a salary text string
+ * Examples: "₹4.5 - ₹6.0 LPA" -> 6.0, "12 LPA" -> 12, "3.5 LPA" -> 3.5
+ */
+export function parseLpaFromSalary(salaryStr?: string): number | null {
+  if (!salaryStr) return null;
+  const clean = salaryStr.replace(/,/g, '');
+  const matches = clean.match(/(\d+(?:\.\d+)?)/g);
+  if (!matches || matches.length === 0) return null;
+  const numbers = matches.map(Number).filter(n => !isNaN(n) && n > 0 && n < 200);
+  if (numbers.length === 0) return null;
+  return Math.max(...numbers);
+}
+
+/**
+ * Helper to match a drive against a standardized salary band.
+ * Checks explicit salaryBand first, then numeric LPA fallback.
+ */
+export function matchesDriveSalaryBand(drive: PlacementDrive, bandId: string | null): boolean {
+  if (!bandId) return true;
+
+  // 1. Explicit assigned salary band
+  if (drive.salaryBand && drive.salaryBand.toLowerCase().trim() === bandId.toLowerCase().trim()) {
+    return true;
+  }
+
+  // 2. Heuristic check based on salary string
+  const band = STANDARDIZED_SALARY_BANDS.find(b => b.id.toLowerCase() === bandId.toLowerCase());
+  if (!band) return false;
+
+  const lpa = parseLpaFromSalary(drive.salary);
+  if (lpa === null) return false;
+
+  if (band.id === 'Category A') return lpa <= 4;
+  if (band.id === 'Category B') return lpa > 4 && lpa <= 6;
+  if (band.id === 'Category C') return lpa > 6 && lpa <= 10;
+  if (band.id === 'Category D') return lpa > 10;
+
+  return false;
+}
+
+/**
+ * Generates a clean URL slug for a placement drive.
+ * Converts Company Name + Title to kebab-case (e.g. "Infosys Specialist Programmer" -> "infosys-specialist-programmer")
+ */
+export function generateDriveSlug(companyName: string = '', title: string = '', fallbackId: string = ''): string {
+  const text = `${companyName} ${title}`.trim();
+  const slug = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+  return slug || (fallbackId ? fallbackId.toLowerCase().replace(/[^a-z0-9-]/g, '') : `drive-${Date.now()}`);
+}
+
+/**
+ * Returns the effective unique identifier / slug for a placement drive.
+ */
+export function getDriveSlug(drive: { slug?: string; id: string; companyName?: string; title?: string } | null | undefined): string {
+  if (!drive) return '';
+  if (drive.slug && drive.slug.trim()) {
+    return drive.slug.trim().toLowerCase().replace(/^[#/]+|\/+$/g, '');
+  }
+  if (drive.companyName && drive.title) {
+    return generateDriveSlug(drive.companyName, drive.title, drive.id);
+  }
+  return drive.id || '';
+}
+
+/**
+ * Generates the full shareable unique URL for a placement drive.
+ * e.g. "https://tantrapex.com/#/drive/infosys-specialist-programmer"
+ */
+export function getDriveShareUrl(drive: { slug?: string; id: string; companyName?: string; title?: string } | null | undefined, origin?: string): string {
+  if (!drive) return '';
+  const slug = getDriveSlug(drive);
+  const base = origin || (typeof window !== 'undefined' ? window.location.origin : '');
+  return `${base}/#/drive/${slug}`;
+}
+
+/**
+ * Helper to lookup a drive by slug, id, or shortCode.
+ */
+export function findDriveBySlugOrId(drives: PlacementDrive[], slugOrId?: string | null): PlacementDrive | null {
+  if (!slugOrId || !Array.isArray(drives) || drives.length === 0) return null;
+  const clean = slugOrId.trim().toLowerCase().replace(/^[#/]+|\/+$/g, '');
+
+  // 1. Exact match on slug
+  const bySlug = drives.find(d => (d.slug || '').trim().toLowerCase() === clean);
+  if (bySlug) return bySlug;
+
+  // 2. Exact match on id
+  const byId = drives.find(d => (d.id || '').trim().toLowerCase() === clean);
+  if (byId) return byId;
+
+  // 3. Match on shortCode
+  const byShortCode = drives.find(d => (d.shortCode || '').trim().toLowerCase() === clean);
+  if (byShortCode) return byShortCode;
+
+  // 4. Fallback generated slug match
+  const byGeneratedSlug = drives.find(d => generateDriveSlug(d.companyName, d.title, d.id) === clean);
+  if (byGeneratedSlug) return byGeneratedSlug;
+
+  return null;
+}
+

@@ -12,6 +12,7 @@ import AdminPanel from './components/dashboard/AdminPanel';
 import PasswordGateway from './components/dashboard/PasswordGateway';
 import VisualEditorHeader from './components/dashboard/VisualEditorHeader';
 import { CMSPage, GlobalSettings, MediaItem, PlacedStudent, HiringPartner, Course, BlogPost, Lead, CMSSection, Service, PlacementDrive } from './types';
+import { Save, RefreshCw } from 'lucide-react';
 
 // Public Page implementations
 import PublicHomePage from './public/home';
@@ -21,6 +22,8 @@ import PublicBlogPage from './public/blog';
 import PublicContactPage from './public/contact';
 import PublicCollegePartnershipPage from './public/colleges';
 import PublicUpcomingDrivesPage from './public/upcoming-drives';
+import PublicDriveDetailPage from './public/drive-detail';
+import PublicFreeRegistrationPage from './public/free-registration';
 import PublicLmsPage from './public/lms';
 import PublicPlacedStudentsPage from './public/placed-students';
 import PublicPartnersPage from './public/partners';
@@ -33,7 +36,7 @@ import { DEFAULT_SERVICES_SECTIONS } from './lib/defaultServices';
 import { DEFAULT_COLLEGES_SECTIONS } from './lib/defaultColleges';
 import { DEFAULT_PLACED_STUDENTS_LIST, DEFAULT_PLACED_STUDENTS_SECTIONS } from './lib/defaultPlacedStudents';
 import { DEFAULT_HIRING_PARTNERS_LIST, DEFAULT_PARTNERS_SECTIONS } from './lib/defaultPartners';
-import { DEFAULT_PLACEMENT_DRIVES_LIST, DEFAULT_UPCOMING_DRIVES_SECTIONS } from './lib/defaultDrives';
+import { DEFAULT_PLACEMENT_DRIVES_LIST, DEFAULT_UPCOMING_DRIVES_SECTIONS, getDriveSlug } from './lib/defaultDrives';
 import { DEFAULT_PRICING_SECTIONS } from './lib/defaultPricing';
 import { DEFAULT_AMBASSADOR_SECTIONS } from './lib/defaultAmbassador';
 import { CANONICAL_PAGES_LIST, CANONICAL_PAGES_MAP } from './lib/defaultPages';
@@ -91,7 +94,7 @@ const EMPTY_SETTINGS: GlobalSettings = {
   secondaryColor: "",
   themeMode: "light",
   containerWidth: "max-w-full",
-  adminPassword: "",
+  adminPassword: "Pratham@@Joshi#123",
   menuItems: []
 };
 
@@ -105,7 +108,15 @@ const EMPTY_PAGE: CMSPage = {
 
 const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
   return rawPages.map(page => {
-    if (!page || !page.sections) return page;
+    if (!page) return page;
+
+    const safeSeo = page.seo || {
+      title: page.title || page.id || '',
+      description: '',
+      keywords: ''
+    };
+
+    if (!page.sections) return { ...page, seo: safeSeo, sections: [] };
 
     // Find deprecated sections to migrate their values if the user previously edited them
     const oldMissionVision = page.sections.find(s => s.type === 'mission-vision');
@@ -250,6 +261,7 @@ const sanitizePages = (rawPages: CMSPage[]): CMSPage[] => {
 
     return {
       ...page,
+      seo: safeSeo,
       sections: cleanedSections.map(section => {
         if (section.type === 'about-main') {
           const content = section.content || {};
@@ -335,6 +347,18 @@ const normalizePageSlug = (slug: string): string => {
 
 const resolvePublicPageId = (route: string, pages: CMSPage[]): string => {
   const normalized = (route || '').trim().toLowerCase().replace(/^[#/]+|\/+$/g, '');
+  if (normalized.startsWith('drive/') || normalized.startsWith('drives/')) {
+    return 'drive-detail';
+  }
+  if (
+    normalized === 'register-for-free' ||
+    normalized === 'register' ||
+    normalized === 'free-registration' ||
+    normalized === 'free-register' ||
+    normalized === 'candidate-registration'
+  ) {
+    return 'register-for-free';
+  }
   if (normalized === '' || normalized === 'home') return 'home';
   if (normalized === 'about' || normalized === 'about-us') return 'about';
   if (normalized === 'contact' || normalized === 'contact-us') return 'contact';
@@ -455,8 +479,11 @@ export default function App() {
     if (!Array.isArray(raw) || raw.length === 0) return [];
     const uniqueMap = new Map<string, PlacementDrive>();
     raw.forEach((item: PlacementDrive) => {
-      if (item && item.id) {
-        uniqueMap.set(item.id, item);
+      if (item && item.id && !item.id.startsWith('drv-infosys') && !item.id.startsWith('drv-ltts') && !item.id.startsWith('drv-capgemini') && !item.id.startsWith('drv-kpit') && !item.id.startsWith('drv-cognizant') && !item.id.startsWith('drv-tatatech') && !item.id.startsWith('drv-zoho') && !item.id.startsWith('drv-aws') && !item.id.startsWith('drv-bosch') && !item.id.startsWith('drv-persistent') && !item.id.startsWith('drv-tcs')) {
+        uniqueMap.set(item.id, {
+          ...item,
+          slug: getDriveSlug(item)
+        });
       }
     });
     return Array.from(uniqueMap.values());
@@ -514,7 +541,37 @@ export default function App() {
   });
 
   // UI View Controls State
-  const [currentPageId, setCurrentPageId] = useState('home');
+  const [currentPageId, setCurrentPageId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const rawRoute = normalizeRoute(hash);
+      if (rawRoute.startsWith('drive/') || rawRoute.startsWith('drives/')) {
+        return 'drive-detail';
+      }
+      if (window.location.pathname.startsWith('/drive/') || window.location.pathname.startsWith('/drives/')) {
+        return 'drive-detail';
+      }
+      const pathClean = (window.location.pathname || '').replace(/^\/+|\/+$/g, '').toLowerCase();
+      if (pathClean === 'register-for-free' || pathClean === 'register' || pathClean === 'free-registration') {
+        return 'register-for-free';
+      }
+      return resolvePublicPageId(rawRoute, []) || 'home';
+    }
+    return 'home';
+  });
+  const [activeDriveSlug, setActiveDriveSlug] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const rawRoute = normalizeRoute(hash);
+      if (rawRoute.startsWith('drive/') || rawRoute.startsWith('drives/')) {
+        return rawRoute.split('/').slice(1).join('/') || null;
+      }
+      if (window.location.pathname.startsWith('/drive/') || window.location.pathname.startsWith('/drives/')) {
+        return window.location.pathname.replace(/^\/drives?\//, '').split(/[?#]/)[0] || null;
+      }
+    }
+    return null;
+  });
   const [viewMode, setViewMode] = useState<'live' | 'superadmin'>('live');
   const [subRoute, setSubRoute] = useState<'dashboard' | 'admin' | 'visual' | 'crm'>('dashboard');
   const [adminActivePageId, setAdminActivePageId] = useState<string>('home');
@@ -572,8 +629,16 @@ export default function App() {
         setViewMode('live');
         // Decode public routes
         const rawRoute = normalizeRoute(hash);
-        const matchedPageId = resolvePublicPageId(rawRoute, pagesRef.current) || 'home';
-        setCurrentPageId(matchedPageId);
+        if (rawRoute.startsWith('drive/') || rawRoute.startsWith('drives/')) {
+          const parts = rawRoute.split('/');
+          const slug = parts.slice(1).join('/');
+          setActiveDriveSlug(slug || null);
+          setCurrentPageId('drive-detail');
+        } else {
+          setActiveDriveSlug(null);
+          const matchedPageId = resolvePublicPageId(rawRoute, pagesRef.current) || 'home';
+          setCurrentPageId(matchedPageId);
+        }
       }
     };
 
@@ -581,6 +646,25 @@ export default function App() {
     handleHashChange();
 
     return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Redirect path-based /drive/:slug or /register-for-free to hash router for cold browser direct landing
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      if (pathname.startsWith('/drive/') || pathname.startsWith('/drives/')) {
+        const slug = pathname.replace(/^\/drives?\//, '').split(/[?#]/)[0];
+        if (slug) {
+          window.history.replaceState(null, '', `/#/drive/${slug}`);
+          window.location.hash = `#/drive/${slug}`;
+        }
+      }
+      const pathClean = pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+      if (pathClean === 'register-for-free' || pathClean === 'register' || pathClean === 'free-registration') {
+        window.history.replaceState(null, '', '/#/register-for-free');
+        window.location.hash = '#/register-for-free';
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -592,6 +676,13 @@ export default function App() {
     }
 
     const rawRoute = normalizeRoute(hash);
+    if (rawRoute.startsWith('drive/') || rawRoute.startsWith('drives/')) {
+      const parts = rawRoute.split('/');
+      const slug = parts.slice(1).join('/');
+      setActiveDriveSlug(slug || null);
+      setCurrentPageId('drive-detail');
+      return;
+    }
     const matchedPageId = resolvePublicPageId(rawRoute, pagesRef.current) || 'home';
     setCurrentPageId(matchedPageId);
   }, [pages]);
@@ -708,9 +799,21 @@ export default function App() {
             setMedia([]);
           }
 
-          setPlacedStudents(Array.isArray(d.placed_students) ? d.placed_students : []);
-          setHiringPartners(Array.isArray(d.hiring_partners) ? d.hiring_partners : []);
-          setPlacementDrives(Array.isArray(d.placement_drives) ? d.placement_drives : []);
+          const dbStudents = Array.isArray(d.placed_students) ? d.placed_students : [];
+          setPlacedStudents(dbStudents);
+          localStorage.setItem('tpx_placed_students', JSON.stringify(dbStudents));
+
+          const dbPartners = Array.isArray(d.hiring_partners) ? d.hiring_partners : [];
+          setHiringPartners(dbPartners);
+          localStorage.setItem('tpx_hiring_partners', JSON.stringify(dbPartners));
+
+          const rawDbDrives = Array.isArray(d.placement_drives) ? d.placement_drives : [];
+          const dbDrives = rawDbDrives.map((drv: PlacementDrive) => ({
+            ...drv,
+            slug: getDriveSlug(drv)
+          }));
+          setPlacementDrives(dbDrives);
+          localStorage.setItem('tpx_placement_drives', JSON.stringify(dbDrives));
 
           if (d.courses && d.courses.length > 0) {
             const m = new Map();
@@ -1021,6 +1124,7 @@ export default function App() {
             hiringPartners={hiringPartners}
             courses={courses}
             blogs={blogs}
+            drives={placementDrives}
             onAddLead={handleAddLead}
             onEditField={handleEditField}
           />
@@ -1100,6 +1204,30 @@ export default function App() {
             onEditField={handleEditField}
           />
         );
+      case 'drive-detail':
+        return (
+          <PublicDriveDetailPage
+            slug={activeDriveSlug}
+            drives={placementDrives}
+            settings={settings}
+            onNavigateBack={() => {
+              window.location.hash = '#/upcoming-drives';
+            }}
+          />
+        );
+      case 'register-for-free':
+        return (
+          <PublicFreeRegistrationPage
+            settings={settings}
+            onAddLead={handleAddLead}
+            onNavigateHome={() => {
+              window.location.hash = '#/';
+            }}
+            onNavigateDrives={() => {
+              window.location.hash = '#/upcoming-drives';
+            }}
+          />
+        );
       case 'lms':
         return (
           <PublicLmsPage
@@ -1157,30 +1285,29 @@ export default function App() {
         return <PolicyPage initialTab="refund" settings={settings} />;
       case 'workshops':
       case 'corporate-workshops': {
-        const workshopsPage = pages.find(p => p.id === 'workshops') || {
-          id: 'workshops',
-          title: 'Upcoming Workshops & Masterclasses',
-          slug: '/workshops',
-          sections: [
-            {
-              id: 'sec-workshops-hero',
-              type: 'hero',
-              title: 'Practical Upskilling & Engineering Masterclasses',
-              subtitle: 'Hands-on technical workshops, resume clinics, and live mock interview panels led by industry veterans.',
-              content: {}
-            },
-            {
-              id: 'sec-workshops-list',
-              type: 'workshops-list',
-              title: 'Upcoming Campus Workshops',
-              subtitle: 'Reserve your verified seat, receive official Admit Cards, and unlock lifetime session recordings.',
-              content: {}
-            }
-          ]
-        };
+        const rawWkPage = pages.find(p => p.id === 'workshops');
+        const defaultWkSections = [
+          {
+            id: 'sec-workshops-hero',
+            type: 'hero',
+            title: 'Practical Upskilling & Engineering Masterclasses',
+            subtitle: 'Hands-on technical workshops, resume clinics, and live mock interview panels led by industry veterans.',
+            content: {}
+          },
+          {
+            id: 'sec-workshops-list',
+            type: 'workshops-list',
+            title: 'Upcoming Campus Workshops',
+            subtitle: 'Reserve your verified seat, receive official Admit Cards, and unlock lifetime session recordings.',
+            content: {}
+          }
+        ];
+        const workshopsSections = (rawWkPage && rawWkPage.sections && rawWkPage.sections.length > 0)
+          ? rawWkPage.sections
+          : defaultWkSections;
         return (
           <div className="w-full flex flex-col">
-            {(workshopsPage.sections || []).map((section: any) => (
+            {workshopsSections.map((section: any) => (
               <div key={section.id}>
                 <DynamicSection
                   section={section}
@@ -2003,6 +2130,9 @@ export default function App() {
             currentPageId={normalizedCurrentPageId}
             setCurrentPageId={(id: string) => {
               const clean = (id || 'home').replace(/^[#/]+/, '').trim().toLowerCase() || 'home';
+              if (clean !== 'drive-detail') {
+                setActiveDriveSlug(null);
+              }
               setCurrentPageId(clean);
             }}
           />
@@ -2029,6 +2159,9 @@ export default function App() {
             pages={pages}
             setCurrentPageId={(id: string) => {
               const clean = (id || 'home').replace(/^[#/]+/, '').trim().toLowerCase() || 'home';
+              if (clean !== 'drive-detail') {
+                setActiveDriveSlug(null);
+              }
               setCurrentPageId(clean);
             }}
             viewMode="live"
@@ -2253,6 +2386,11 @@ export default function App() {
                     <span className="text-xs font-semibold text-slate-400">Database Collections Core Admin Hub</span>
                   </div>
                   <div className="flex items-center gap-3">
+                    {saveStatusMessage && (
+                      <span className="text-xs text-emerald-400 font-medium px-2 py-0.5 bg-emerald-950/50 rounded border border-emerald-800">
+                        {saveStatusMessage}
+                      </span>
+                    )}
                     {mongoDbStatus === 'connected' ? (
                       <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-mono bg-emerald-950/40 border border-emerald-900 px-2.5 py-1 rounded">
                         <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-ping" />
@@ -2269,6 +2407,24 @@ export default function App() {
                         <span>MongoDB Disconnected (Local Active)</span>
                       </div>
                     )}
+                    <button
+                      onClick={handleSaveVisualDraft}
+                      disabled={isSavingDraft}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:bg-slate-700 disabled:text-slate-400 border border-emerald-500 text-xs text-white rounded-lg transition-all font-bold cursor-pointer shadow-md"
+                      title="Sync all current pages, media, and database collections directly to MongoDB Atlas"
+                    >
+                      {isSavingDraft ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Saving to Atlas...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-3.5 w-3.5" />
+                          <span>Save All to MongoDB Atlas</span>
+                        </>
+                      )}
+                    </button>
                     <button
                       onClick={handleResetDatabase}
                       className="px-3 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-rose-400 hover:text-rose-300 rounded-lg transition-colors font-semibold cursor-pointer"

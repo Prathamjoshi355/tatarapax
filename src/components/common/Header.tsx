@@ -322,7 +322,7 @@ export default function Header({
               <button
                 id="nav-cta-drives"
                 onClick={() => handleLinkClick(cfg.ctaButtonLink || '#/upcoming-drives')}
-                className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-[#80d64b] hover:bg-[#72c242] text-[#092100] font-bold text-xs sm:text-sm rounded-lg transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap"
+                className="hidden lg:inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-[#80d64b] hover:bg-[#72c242] text-[#092100] font-bold text-xs sm:text-sm rounded-lg transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap"
               >
                 <span>{cfg.ctaButtonText || 'Explore Placement Drives'}</span>
                 <ArrowRight className="w-4 h-4 text-[#092100]" />

@@ -7,7 +7,7 @@ export const DEFAULT_POLICIES_CONFIG: PoliciesConfig = {
     companyName: 'Tantrapex Technology Pvt. Ltd.',
     introText: 'Tantrapex Technology Pvt. Ltd. respects the privacy of all candidates and is committed to protecting their personal information. By registering with us, you agree to the collection and use of your data as outlined in this Privacy Policy.',
     lastUpdated: 'Updated 2026',
-    contactEmail1: 'info@tantrapex.com',
+    contactEmail1: 'Contact@tantrapex.com',
     contactEmail2: 'hr@tantrapex.com',
     sections: [
       {

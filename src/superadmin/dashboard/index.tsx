@@ -325,7 +325,7 @@ export default function SuperAdminDashboard({
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-extrabold text-lg text-white group-hover:text-blue-400 transition-colors">{p.title} Page</h3>
+                      <h3 className="font-extrabold text-lg text-white group-hover:text-blue-400 transition-colors">{(p.title || p.id || 'Custom')} Page</h3>
                       {isFullySupported ? (
                         <span className="bg-blue-500/10 text-blue-400 text-[8px] px-1.5 py-0.5 rounded font-mono font-bold uppercase tracking-wider border border-blue-500/20">
                           Three-Page Architecture
@@ -336,8 +336,8 @@ export default function SuperAdminDashboard({
                         </span>
                       )}
                     </div>
-                    <span className="text-xs font-mono text-slate-400">Path Reference: {p.slug}</span>
-                    <p className="text-xs text-slate-500 leading-relaxed mt-1">{p.seo.description || "Fully customizable document containing design schemes and component nodes."}</p>
+                    <span className="text-xs font-mono text-slate-400">Path Reference: {p.slug || `/${p.id || ''}`}</span>
+                    <p className="text-xs text-slate-500 leading-relaxed mt-1">{p.seo?.description || "Fully customizable document containing design schemes and component nodes."}</p>
                   </div>
                 </div>
 

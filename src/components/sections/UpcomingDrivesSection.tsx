@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { PlacementDrive } from '../../types';
+import { getDriveSlug } from '../../lib/defaultDrives';
 import DriveApplicationModal from '../drives/DriveApplicationModal';
+import DriveDetailsModal from '../drives/DriveDetailsModal';
 import { Building2, MapPin, Calendar, Award, ArrowRight, Clock, Briefcase, CheckCircle2, X, Lock } from 'lucide-react';
 
 interface UpcomingDrivesSectionProps {
@@ -122,7 +124,9 @@ export default function UpcomingDrivesSection({
                             </span>
                           </div>
                           <h3 className="text-sm sm:text-base font-extrabold text-slate-900 leading-snug truncate mt-0.5">
-                            {drive.title}
+                            <a href={`#/drive/${getDriveSlug(drive)}`} className="hover:text-blue-600 transition-colors">
+                              {drive.title}
+                            </a>
                           </h3>
                         </div>
                       </div>
@@ -168,12 +172,16 @@ export default function UpcomingDrivesSection({
                     )}
 
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setDetailDrive(drive)}
-                        className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
+                      <a
+                        href={`#/drive/${getDriveSlug(drive)}`}
+                        onClick={() => {
+                          window.location.hash = `#/drive/${getDriveSlug(drive)}`;
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors inline-block"
                       >
                         Details
-                      </button>
+                      </a>
 
                       {isOnCampus ? (
                         <span
@@ -215,130 +223,14 @@ export default function UpcomingDrivesSection({
 
       {/* Details Modal */}
       {detailDrive && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative w-full max-w-3xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6 my-8">
-            <button 
-              onClick={() => setDetailDrive(null)}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-start gap-3">
-              {detailDrive.companyLogo ? (
-                <div className="w-14 h-14 bg-white border border-slate-200 rounded-xl p-1.5 flex items-center justify-center shrink-0">
-                  <img src={detailDrive.companyLogo} alt={detailDrive.companyName} className="max-h-full max-w-full object-contain" />
-                </div>
-              ) : (
-                <div className="w-14 h-14 bg-emerald-600 text-white rounded-xl flex items-center justify-center shrink-0">
-                  <Building2 className="w-7 h-7" />
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">{detailDrive.companyName || 'Corporate Partner'}</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
-                    detailDrive.driveType === 'on-campus'
-                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                      : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  }`}>
-                    {detailDrive.driveType === 'on-campus' ? 'On-Campus (Exclusive)' : 'Off-Campus (Open)'}
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 font-display mt-0.5">{detailDrive.title}</h2>
-                {detailDrive.salary && (
-                  <span className="inline-block mt-1 font-bold text-sm text-[#2e6c00] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    Package: {detailDrive.salary}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* On-Campus Information Alert */}
-            {detailDrive.driveType === 'on-campus' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-amber-900">
-                <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <span className="font-extrabold text-xs uppercase tracking-wider text-amber-800 block">
-                    On-Campus Recruitment Opportunity
-                  </span>
-                  <p className="text-xs text-amber-800 leading-relaxed">
-                    This drive is conducted exclusively for candidates enrolled in our corporate partner programs and internal LMS. Direct public web registration is closed. Enrolled students should log in to their student LMS portal to access assessments and interview schedules.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Eligibility & Specification Grid */}
-            <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Eligible Degree & Branch</span>
-                <span className="font-semibold text-slate-800">{detailDrive.eligibleDegree || 'Any Graduate'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Eligible Batch</span>
-                <span className="font-semibold text-slate-800">{detailDrive.eligibleBatch || 'All Batches'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Location / Work Mode</span>
-                <span className="font-semibold text-slate-800">{detailDrive.location || 'On-Site / Remote'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Application Deadline</span>
-                <span className="font-bold text-rose-600">{detailDrive.deadline || 'Open'}</span>
-              </div>
-            </div>
-
-            {/* Job Description */}
-            {detailDrive.description && (
-              <div className="space-y-1.5 text-xs text-slate-700">
-                <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">Role Description</h4>
-                <p className="leading-relaxed whitespace-pre-line">{detailDrive.description}</p>
-              </div>
-            )}
-
-            {/* Selection Process */}
-            {detailDrive.selectionProcess && (
-              <div className="space-y-1.5 text-xs text-slate-700">
-                <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">Selection Process</h4>
-                <p className="leading-relaxed">{detailDrive.selectionProcess}</p>
-              </div>
-            )}
-
-            {/* Required Skills */}
-            {detailDrive.skills && (
-              <div className="space-y-1.5 text-xs text-slate-700">
-                <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">Required Competencies</h4>
-                <p className="leading-relaxed font-semibold">{detailDrive.skills}</p>
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <span className="text-xs font-bold text-emerald-700">Zero Application Fee • Verified Corporate Partner</span>
-
-              {detailDrive.driveType === 'on-campus' ? (
-                <button
-                  disabled
-                  className="w-full sm:w-auto px-6 py-2.5 bg-slate-100 border border-slate-300 text-slate-500 font-bold rounded-lg text-xs cursor-not-allowed flex items-center justify-center gap-1.5 shadow-none"
-                >
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Enrolled Students Only (Public Apply Closed)</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    const driveToApply = detailDrive;
-                    setDetailDrive(null);
-                    setActiveApplyingDrive(driveToApply);
-                  }}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-[#2e6c00] hover:bg-[#255700] text-white font-bold rounded-lg text-xs shadow transition-colors"
-                >
-                  Apply for this Drive (Free)
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <DriveDetailsModal
+          drive={detailDrive}
+          onClose={() => setDetailDrive(null)}
+          onApply={(d) => {
+            setDetailDrive(null);
+            setActiveApplyingDrive(d);
+          }}
+        />
       )}
 
       {/* Application Modal */}

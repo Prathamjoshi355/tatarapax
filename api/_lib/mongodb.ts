@@ -21,7 +21,12 @@ function checkUriIssues(uri: string): string | null {
       return "Your MONGODB_URI contains multiple '@' characters. If your database password contains an '@' character, you MUST replace it with its percent-encoded equivalent '%40' in the connection string (e.g., p%40ssword instead of p@ssword).";
     }
 
-    // Check for other raw special characters in the auth section
+    // If there is NO '@', there is no user:password auth section to validate (e.g. mongodb://localhost:27017/Tantapex)
+    if (parts.length <= 1) {
+      return null;
+    }
+
+    // Check for other raw special characters in the auth section (only if '@' is present)
     const authAndScheme = parts[0];
     const schemeIndex = authAndScheme.indexOf("://");
     if (schemeIndex !== -1) {
@@ -52,12 +57,17 @@ function checkUriIssues(uri: string): string | null {
 }
 
 export async function getDb(): Promise<{ db: Db | null; connectionError: string | null }> {
-  if (!uri) {
-    connectionError = "MONGODB_URI is not defined. Please add it via AI Studio settings.";
+  try {
+    dotenv.config();
+  } catch {}
+
+  const activeUri = (process.env.MONGODB_URI || uri || "").trim();
+  if (!activeUri) {
+    connectionError = "MONGODB_URI is not defined in environment variables.";
     return { db: null, connectionError };
   }
   
-  const uriIssue = checkUriIssues(uri);
+  const uriIssue = checkUriIssues(activeUri);
   if (uriIssue) {
     connectionError = uriIssue;
     return { db: null, connectionError };
@@ -68,23 +78,32 @@ export async function getDb(): Promise<{ db: Db | null; connectionError: string 
   }
 
   const now = Date.now();
-  // Throttle reconnection attempts to once per 15 seconds to prevent hanging the event loop
-  if (connectionError && (now - lastAttemptTime < 15000)) {
+  // Throttle reconnection attempts to once per 5 seconds
+  if (connectionError && (now - lastAttemptTime < 5000)) {
     return { db: null, connectionError };
   }
 
   lastAttemptTime = now;
   try {
     console.log("Connecting to MongoDB in serverless function...");
-    client = new MongoClient(uri, {
+    client = new MongoClient(activeUri, {
       connectTimeoutMS: 5000,
       serverSelectionTimeoutMS: 5000,
     });
     await client.connect();
+
     // Parse db name from URI or default to "tatrapax"
-    db = client.db("tatrapax");
+    let dbName = "tatrapax";
+    const match = activeUri.match(/(?:mongodb(?:\+srv)?:\/\/[^/]+\/)([^?&/\s]+)/i);
+    if (match && match[1]) {
+      dbName = match[1].trim();
+      if (activeUri.includes("tatrapax.btmauq4.mongodb.net") && dbName.toLowerCase() === "tantapex") {
+        dbName = "tatrapax";
+      }
+    }
+    db = client.db(dbName);
     connectionError = null;
-    console.log("Connected to MongoDB successfully!");
+    console.log(`Connected to MongoDB successfully! Database: ${dbName}`);
   } catch (err: any) {
     console.error("Failed to connect to MongoDB:", err);
     connectionError = err.message || String(err);

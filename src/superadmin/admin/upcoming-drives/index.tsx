@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { CMSPage, PlacementDrive, CMSSection, MediaItem } from '../../../types';
-import { DEFAULT_PLACEMENT_DRIVES_LIST, DEFAULT_UPCOMING_DRIVES_SECTIONS } from '../../../lib/defaultDrives';
+import { CMSPage, PlacementDrive, CMSSection, MediaItem, DriveFormField, DEFAULT_DRIVE_FORM_FIELDS } from '../../../types';
+import { 
+  DEFAULT_PLACEMENT_DRIVES_LIST, 
+  DEFAULT_UPCOMING_DRIVES_SECTIONS, 
+  PREDEFINED_DOMAINS, 
+  STANDARDIZED_SALARY_BANDS,
+  generateDriveSlug,
+  getDriveSlug,
+  getDriveShareUrl
+} from '../../../lib/defaultDrives';
 import { 
   Building2, Briefcase, Plus, Trash2, Edit3, Save, Check, RefreshCw, 
   ExternalLink, Search, ShieldCheck, Phone, BookOpen, Layers, Award,
-  Sparkles, Globe, Clock, MapPin, School, GraduationCap, X
+  Sparkles, Globe, Clock, MapPin, School, GraduationCap, X, Sliders, Users,
+  Link2, Copy
 } from 'lucide-react';
 
 interface AdminUpcomingDrivesPageProps {
@@ -46,6 +55,26 @@ export default function AdminUpcomingDrivesPage({
   // Editing drive modal state
   const [editingDrive, setEditingDrive] = useState<PlacementDrive | null>(null);
   const [isNewDrive, setIsNewDrive] = useState(false);
+  const [editModalTab, setEditModalTab] = useState<'details' | 'form'>('details');
+  const [isAddingCustomField, setIsAddingCustomField] = useState(false);
+  const [customFieldLabel, setCustomFieldLabel] = useState('');
+  const [customFieldType, setCustomFieldType] = useState<string>('text');
+  const [customFieldRequired, setCustomFieldRequired] = useState(false);
+
+  // Fetch drives from API on mount
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/placement-drives?all=true')
+      .then(r => r.json())
+      .then(data => {
+        if (isMounted && data.success && Array.isArray(data.drives)) {
+          setDrivesList(data.drives);
+          if (propSetDrives) propSetDrives(data.drives);
+        }
+      })
+      .catch(err => console.warn('Could not fetch placement drives from API:', err));
+    return () => { isMounted = false; };
+  }, []);
 
   // SEO state
   const [seoTitle, setSeoTitle] = useState(page.seo?.title || 'Upcoming Placement Opportunities | TantraPex');
@@ -79,10 +108,12 @@ export default function AdminUpcomingDrivesPage({
       categoryLabel: 'IT Services',
       salaryBand: 'Category B',
       title: 'Graduate Software Engineer',
+      slug: '',
       salary: '₹5.00 LPA',
       salarySubtext: 'Annual CTC',
       eligibleBatch: '2024 & 2025 Passing Out',
       eligibleDegree: 'B.Tech / BE / MCA',
+      experience: 'Freshers',
       batchSubtext: 'Circuit Branches / Computer Science',
       minCgpa: '6.0 CGPA Minimum',
       location: 'Bengaluru / Hybrid',
@@ -91,39 +122,73 @@ export default function AdminUpcomingDrivesPage({
       statusSubtext: 'No Registration Charges',
       status: 'published',
       driveType: 'off-campus',
+      googleFormUrl: '',
+      whatsappGroupUrl: '',
+      applyMode: 'internal',
+      formFields: DEFAULT_DRIVE_FORM_FIELDS.map(f => ({ ...f })),
       skills: 'Programming, Problem Solving, Web Technologies',
       description: 'Campus recruitment drive for fresh engineering graduates.',
       createdAt: new Date().toISOString()
     };
     setIsNewDrive(true);
+    setEditModalTab('details');
+    setIsAddingCustomField(false);
     setEditingDrive(newDrive);
   };
 
-  const handleSaveDriveModal = (e: React.FormEvent) => {
+  const handleSaveDriveModal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDrive) return;
 
+    const driveToSave: PlacementDrive = {
+      ...editingDrive,
+      slug: editingDrive.slug || generateDriveSlug(editingDrive.companyName, editingDrive.title, editingDrive.id),
+      googleFormUrl: editingDrive.googleFormUrl || '',
+      whatsappGroupUrl: editingDrive.whatsappGroupUrl || '',
+      applyMode: editingDrive.applyMode || 'internal',
+      formFields: (editingDrive.formFields && editingDrive.formFields.length > 0)
+        ? editingDrive.formFields
+        : DEFAULT_DRIVE_FORM_FIELDS.map(f => ({ ...f }))
+    };
+
     let updatedList: PlacementDrive[];
     if (isNewDrive) {
-      updatedList = [editingDrive, ...drivesList];
+      updatedList = [driveToSave, ...drivesList];
     } else {
-      updatedList = drivesList.map(d => d.id === editingDrive.id ? editingDrive : d);
+      updatedList = drivesList.map(d => d.id === driveToSave.id ? driveToSave : d);
     }
 
     setDrivesList(updatedList);
     if (propSetDrives) propSetDrives(updatedList);
     localStorage.setItem('tpx_placement_drives', JSON.stringify(updatedList));
 
+    // Save directly to MongoDB endpoint
+    try {
+      await fetch('/api/placement-drives/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(driveToSave)
+      });
+    } catch (saveErr) {
+      console.warn('Direct MongoDB save failed:', saveErr);
+    }
+
     setEditingDrive(null);
     setIsNewDrive(false);
   };
 
-  const handleDeleteDrive = (id: string) => {
+  const handleDeleteDrive = async (id: string) => {
     if (confirm('Are you sure you want to delete this placement drive?')) {
       const updated = drivesList.filter(d => d.id !== id);
       setDrivesList(updated);
       if (propSetDrives) propSetDrives(updated);
       localStorage.setItem('tpx_placement_drives', JSON.stringify(updated));
+
+      try {
+        await fetch(`/api/placement-drives/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Delete drive from MongoDB failed:', err);
+      }
     }
   };
 
@@ -416,6 +481,25 @@ export default function AdminUpcomingDrivesPage({
                   className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 flex flex-col justify-between transition-all group shadow-sm"
                 >
                   <div>
+                    {/* Top Row: Registered Candidates Counter */}
+                    <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${(drive.applicantCount || 0) > 0 ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
+                          <span className={`relative inline-flex rounded-full h-2 w-2 ${(drive.applicantCount || 0) > 0 ? 'bg-emerald-500' : 'bg-slate-500'}`}></span>
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Registered Candidates
+                        </span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-mono text-xs font-bold ${
+                        (drive.applicantCount || 0) > 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        <Users className="w-3 h-3" />
+                        <span>{drive.applicantCount || 0} Registered</span>
+                      </span>
+                    </div>
+
                     {/* Top row */}
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex items-center gap-3">
@@ -442,7 +526,17 @@ export default function AdminUpcomingDrivesPage({
                     </div>
 
                     <div className="py-2 border-y border-slate-800/80 my-3">
-                      <p className="text-sm font-bold text-white leading-tight">{drive.title}</p>
+                      <p className="text-sm font-bold text-white leading-tight">
+                        <a
+                          href={`#/drive/${getDriveSlug(drive)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:text-blue-400 hover:underline"
+                          title="Open unique student drive page"
+                        >
+                          {drive.title}
+                        </a>
+                      </p>
                       <p className="text-xs font-extrabold text-emerald-400 mt-1">
                         {drive.salary} <span className="text-[11px] text-slate-500 font-normal">({drive.salarySubtext || 'Annual CTC'})</span>
                       </p>
@@ -454,6 +548,26 @@ export default function AdminUpcomingDrivesPage({
                       <p><strong className="text-slate-300">Location:</strong> {drive.location}</p>
                       <p><strong className="text-slate-300">Deadline:</strong> <span className="text-red-400 font-semibold">{drive.deadline}</span></p>
                     </div>
+
+                    {/* Unique Placement Drive Direct URL Strip */}
+                    <a
+                      href={`#/drive/${getDriveSlug(drive)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-1.5 bg-slate-950/60 hover:bg-slate-950 p-2 rounded-lg border border-slate-800 text-slate-300 transition-colors group cursor-pointer"
+                      title="Directly hit this drive's unique URL in new tab"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Link2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="font-mono text-[10px] text-slate-300 truncate group-hover:underline">
+                          #/drive/{getDriveSlug(drive)}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <span>Open URL</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </span>
+                    </a>
                   </div>
 
                   {/* Actions */}
@@ -462,7 +576,17 @@ export default function AdminUpcomingDrivesPage({
                       type="button"
                       onClick={() => {
                         setIsNewDrive(false);
-                        setEditingDrive({ ...drive });
+                        setEditingDrive({
+                          ...drive,
+                          googleFormUrl: drive.googleFormUrl || '',
+                          whatsappGroupUrl: drive.whatsappGroupUrl || '',
+                          applyMode: drive.applyMode || 'internal',
+                          formFields: (drive.formFields && drive.formFields.length > 0)
+                            ? drive.formFields.map(f => ({ ...f }))
+                            : DEFAULT_DRIVE_FORM_FIELDS.map(f => ({ ...f }))
+                        });
+                        setEditModalTab('details');
+                        setIsAddingCustomField(false);
                       }}
                       className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
@@ -963,217 +1087,596 @@ export default function AdminUpcomingDrivesPage({
               Configure company credentials, packages, criteria, and deadline.
             </p>
 
+            {/* Modal Tab Switcher */}
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-4">
+              <button
+                type="button"
+                onClick={() => setEditModalTab('details')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  editModalTab === 'details'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>Drive Details & Eligibility</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditModalTab('form')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  editModalTab === 'form'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Application Form Builder (Dynamic) & Google Form</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-slate-900/80 text-emerald-300 font-mono border border-emerald-500/40">
+                  {editingDrive.formFields?.filter(f => f.enabled !== false).length || 0} active
+                </span>
+              </button>
+            </div>
+
             <form onSubmit={handleSaveDriveModal} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Company Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingDrive.companyName}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, companyName: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">ShortCode / Initials (e.g. LTTS, AWS)</label>
-                  <input
-                    type="text"
-                    value={editingDrive.shortCode || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, shortCode: e.target.value.toUpperCase() })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-              </div>
+              {editModalTab === 'details' ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Company Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editingDrive.companyName}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, companyName: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">ShortCode / Initials (e.g. LTTS, AWS)</label>
+                      <input
+                        type="text"
+                        value={editingDrive.shortCode || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, shortCode: e.target.value.toUpperCase() })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Job Role Title *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingDrive.title}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, title: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Company Logo URL</label>
-                  <input
-                    type="text"
-                    value={editingDrive.companyLogo || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, companyLogo: e.target.value })}
-                    placeholder="https://... (or leave empty for initials)"
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Job Role Title *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editingDrive.title}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, title: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Company Logo URL</label>
+                      <input
+                        type="text"
+                        value={editingDrive.companyLogo || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, companyLogo: e.target.value })}
+                        placeholder="https://... (or leave empty for initials)"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Category</label>
-                  <select
-                    value={editingDrive.category || 'it'}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      let label = 'IT Services';
-                      if (val === 'core') label = 'Core Engineering';
-                      if (val === 'product') label = 'Product';
-                      setEditingDrive({ ...editingDrive, category: val, categoryLabel: label });
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  >
-                    <option value="it">IT & Software</option>
-                    <option value="core">Core Engineering</option>
-                    <option value="product">Product Companies</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Category Label</label>
-                  <input
-                    type="text"
-                    value={editingDrive.categoryLabel || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, categoryLabel: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Salary Band</label>
-                  <select
-                    value={editingDrive.salaryBand || 'Category B'}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, salaryBand: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  >
-                    <option value="Category A">Category A (Up to 4L)</option>
-                    <option value="Category B">Category B (Up to 6L)</option>
-                    <option value="Category C">Category C (Up to 9L)</option>
-                    <option value="Category D">Category D (Dream 9L+)</option>
-                  </select>
-                </div>
-              </div>
+                  {/* Unique Public Shareable URL Slug Field */}
+                  <div className="bg-slate-950/80 border border-blue-500/30 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-blue-400" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                          Unique Drive Shareable URL
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-blue-300 font-mono">
+                        Direct Student Landing Link
+                      </span>
+                    </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Salary / Package (e.g. ₹5.75 LPA) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingDrive.salary || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, salary: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Salary Subtext</label>
-                  <input
-                    type="text"
-                    value={editingDrive.salarySubtext || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, salarySubtext: e.target.value })}
-                    placeholder="Fixed Annual CTC / Performance Driven"
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-              </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-2 text-slate-500 font-mono text-xs select-none">
+                            #/drive/
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="e.g. ltts-associate-engineer"
+                            value={editingDrive.slug || ''}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const clean = raw.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-');
+                              setEditingDrive({ ...editingDrive, slug: clean });
+                            }}
+                            className="w-full bg-slate-900 border border-slate-800 pl-18 pr-3 py-2 rounded-xl text-xs text-white font-mono focus:border-blue-500 focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const gen = generateDriveSlug(editingDrive.companyName, editingDrive.title, editingDrive.id);
+                            setEditingDrive({ ...editingDrive, slug: gen });
+                          }}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer shadow-xs"
+                        >
+                          Auto-Generate
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                        <span className="truncate mr-2 font-mono text-blue-300">
+                          Preview: {typeof window !== 'undefined' ? `${window.location.origin}/#/drive/${editingDrive.slug || generateDriveSlug(editingDrive.companyName, editingDrive.title, editingDrive.id)}` : `/#/drive/${editingDrive.slug || 'drive'}`}
+                        </span>
+                        <a
+                          href={typeof window !== 'undefined' ? `${window.location.origin}/#/drive/${editingDrive.slug || generateDriveSlug(editingDrive.companyName, editingDrive.title, editingDrive.id)}` : `/#/drive/${editingDrive.slug || 'drive'}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-400 hover:text-blue-300 underline font-semibold shrink-0 cursor-pointer inline-flex items-center gap-1"
+                          title="Directly test this drive's unique URL in new tab"
+                        >
+                          <span>Open Preview</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Eligible Batch (e.g. 2024 & 2025)</label>
-                  <input
-                    type="text"
-                    value={editingDrive.eligibleBatch || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, eligibleBatch: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Eligible Degree / Specialization</label>
-                  <input
-                    type="text"
-                    value={editingDrive.batchSubtext || editingDrive.eligibleDegree || ''}
-                    onChange={(e) => setEditingDrive({ 
-                      ...editingDrive, 
-                      batchSubtext: e.target.value,
-                      eligibleDegree: e.target.value 
-                    })}
-                    placeholder="BE / B.Tech (ECE, EEE, Mechanical, CSE)"
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Domain / Career Stream (Optional)
+                      </label>
+                      <select
+                        value={editingDrive.domain || editingDrive.category || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const found = PREDEFINED_DOMAINS.find(d => d.id === val);
+                          setEditingDrive({ 
+                            ...editingDrive, 
+                            domain: val,
+                            domainLabel: found ? found.label : '',
+                            category: val, 
+                            categoryLabel: found ? found.shortLabel : ''
+                          });
+                        }}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      >
+                        <option value="">Auto-Detect from Role & Skills (Default)</option>
+                        {PREDEFINED_DOMAINS.map(d => (
+                          <option key={d.id} value={d.id}>{d.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Display Label</label>
+                      <input
+                        type="text"
+                        value={editingDrive.domainLabel || editingDrive.categoryLabel || ''}
+                        onChange={(e) => setEditingDrive({ 
+                          ...editingDrive, 
+                          domainLabel: e.target.value,
+                          categoryLabel: e.target.value 
+                        })}
+                        placeholder="e.g. IT & Software / Core"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Salary Band (Optional)
+                      </label>
+                      <select
+                        value={editingDrive.salaryBand || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, salaryBand: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      >
+                        <option value="">Auto-Detect from CTC (Default)</option>
+                        {STANDARDIZED_SALARY_BANDS.map(b => (
+                          <option key={b.id} value={b.id}>{b.label} ({b.range})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">CGPA / Cut-off</label>
-                  <input
-                    type="text"
-                    value={editingDrive.minCgpa || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, minCgpa: e.target.value })}
-                    placeholder="6.0 CGPA / No minimum cut-off"
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Job Location</label>
-                  <input
-                    type="text"
-                    value={editingDrive.location || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, location: e.target.value })}
-                    placeholder="Bengaluru, Pune, PAN India"
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Application Deadline</label>
-                  <input
-                    type="date"
-                    value={editingDrive.deadline || ''}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, deadline: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Salary / Package (e.g. ₹5.75 LPA) *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editingDrive.salary || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, salary: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Salary Subtext</label>
+                      <input
+                        type="text"
+                        value={editingDrive.salarySubtext || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, salarySubtext: e.target.value })}
+                        placeholder="Fixed Annual CTC / Performance Driven"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Status Badge Text</label>
-                  <input
-                    type="text"
-                    value={editingDrive.statusBadge || 'Applications Open'}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, statusBadge: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Status Subtext</label>
-                  <input
-                    type="text"
-                    value={editingDrive.statusSubtext || 'No Registration Charges'}
-                    onChange={(e) => setEditingDrive({ ...editingDrive, statusSubtext: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Eligible Batch (e.g. 2024 & 2025, or All Batches)</label>
+                      <input
+                        type="text"
+                        value={editingDrive.eligibleBatch || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, eligibleBatch: e.target.value })}
+                        placeholder="e.g. 2024 & 2025 or All Batches"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Required Experience (e.g. Freshers / 0-2 Years)</label>
+                      <input
+                        type="text"
+                        value={editingDrive.experience || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, experience: e.target.value })}
+                        placeholder="Freshers / 0-2 Years / Any"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Eligible Degree / Specialization</label>
+                      <input
+                        type="text"
+                        value={editingDrive.batchSubtext || editingDrive.eligibleDegree || ''}
+                        onChange={(e) => setEditingDrive({ 
+                          ...editingDrive, 
+                          batchSubtext: e.target.value,
+                          eligibleDegree: e.target.value 
+                        })}
+                        placeholder="BE / B.Tech (ECE, EEE, Mechanical, CSE)"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Required Skills (Comma-separated)</label>
-                <input
-                  type="text"
-                  value={editingDrive.skills || ''}
-                  onChange={(e) => setEditingDrive({ ...editingDrive, skills: e.target.value })}
-                  placeholder="Java, Python, Cloud, Data Structures, Embedded C"
-                  className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                />
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">CGPA / Cut-off</label>
+                      <input
+                        type="text"
+                        value={editingDrive.minCgpa || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, minCgpa: e.target.value })}
+                        placeholder="6.0 CGPA / No minimum cut-off"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Job Location</label>
+                      <input
+                        type="text"
+                        value={editingDrive.location || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, location: e.target.value })}
+                        placeholder="Bengaluru, Pune, PAN India"
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Application Deadline</label>
+                      <input
+                        type="date"
+                        value={editingDrive.deadline || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, deadline: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Role Description & Overview</label>
-                <textarea
-                  rows={2}
-                  value={editingDrive.description || ''}
-                  onChange={(e) => setEditingDrive({ ...editingDrive, description: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
-                />
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Status Badge Text</label>
+                      <input
+                        type="text"
+                        value={editingDrive.statusBadge || 'Applications Open'}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, statusBadge: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Status Subtext</label>
+                      <input
+                        type="text"
+                        value={editingDrive.statusSubtext || 'No Registration Charges'}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, statusSubtext: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Required Skills (Comma-separated)</label>
+                    <input
+                      type="text"
+                      value={editingDrive.skills || ''}
+                      onChange={(e) => setEditingDrive({ ...editingDrive, skills: e.target.value })}
+                      placeholder="Java, Python, Cloud, Data Structures, Embedded C"
+                      className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Role Description & Overview</label>
+                    <textarea
+                      rows={2}
+                      value={editingDrive.description || ''}
+                      onChange={(e) => setEditingDrive({ ...editingDrive, description: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs text-white"
+                    />
+                  </div>
+                </>
+              ) : (
+                /* TAB 2: Dynamic Form Builder & Google Form Integration */
+                <div className="space-y-4">
+                  {/* Google Form Integration Box */}
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                        External Integration
+                      </span>
+                      <h4 className="text-xs font-bold text-white">Google Form / External Registration</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2 space-y-1">
+                        <label className="block text-[11px] font-bold text-slate-400">Google Form URL</label>
+                        <input
+                          type="url"
+                          placeholder="https://docs.google.com/forms/d/e/.../viewform"
+                          value={editingDrive.googleFormUrl || ''}
+                          onChange={(e) => setEditingDrive({ ...editingDrive, googleFormUrl: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg text-xs text-white font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-slate-400">Application Mode</label>
+                        <select
+                          value={editingDrive.applyMode || 'internal'}
+                          onChange={(e) => setEditingDrive({ ...editingDrive, applyMode: e.target.value as any })}
+                          className="w-full bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg text-xs text-white font-bold"
+                        >
+                          <option value="internal">Dynamic Internal Form</option>
+                          <option value="google-form">Google Form (Direct)</option>
+                          <option value="both">Both (Show Link + Form)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* WhatsApp Group Invite URL */}
+                    <div className="pt-3 border-t border-slate-800/80 space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                        <span className="text-[#25D366] text-sm">💬</span>
+                        <span>WhatsApp Group Invite Link (Optional)</span>
+                        <span className="text-[10px] text-slate-500 font-normal">• Company-specific update group</span>
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="https://chat.whatsapp.com/..."
+                        value={editingDrive.whatsappGroupUrl || ''}
+                        onChange={(e) => setEditingDrive({ ...editingDrive, whatsappGroupUrl: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg text-xs text-white font-mono focus:border-emerald-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        When configured, applicants who complete their submission will see a prominent "Join the Group" button directing them to this WhatsApp link on the success screen and in their confirmation email.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Form Fields Manager */}
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                      <div>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                          <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Candidate Application Questions & Fields</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Configure which questions and documents candidates must provide.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingDrive({
+                              ...editingDrive,
+                              formFields: DEFAULT_DRIVE_FORM_FIELDS.map(f => ({ ...f }))
+                            });
+                          }}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg"
+                        >
+                          Reset Standard
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingCustomField(!isAddingCustomField);
+                            setCustomFieldLabel('');
+                            setCustomFieldType('text');
+                            setCustomFieldRequired(false);
+                          }}
+                          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add Field</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Add Custom Field Panel */}
+                    {isAddingCustomField && (
+                      <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2.5">
+                        <span className="text-xs font-bold text-white block">Add Custom Field to this Drive</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              placeholder="Field / Question Label (e.g. Portfolio Link, Github URL)"
+                              value={customFieldLabel}
+                              onChange={(e) => setCustomFieldLabel(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 px-3 py-1.5 rounded-lg text-xs text-white"
+                            />
+                          </div>
+                          <div>
+                            <select
+                              value={customFieldType}
+                              onChange={(e) => setCustomFieldType(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 px-3 py-1.5 rounded-lg text-xs text-white"
+                            >
+                              <option value="text">Short Text</option>
+                              <option value="textarea">Paragraph / Long Text</option>
+                              <option value="number">Number</option>
+                              <option value="email">Email</option>
+                              <option value="tel">Phone / Mobile</option>
+                              <option value="file">File Upload (max 10MB)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={customFieldRequired}
+                              onChange={(e) => setCustomFieldRequired(e.target.checked)}
+                              className="rounded border-slate-700 text-blue-600"
+                            />
+                            <span>Required Field (*)</span>
+                          </label>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsAddingCustomField(false)}
+                              className="px-3 py-1 text-slate-400 hover:text-white text-xs"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!customFieldLabel.trim()) return;
+                                const newF: DriveFormField = {
+                                  id: `custom_${Date.now()}`,
+                                  label: customFieldLabel.trim(),
+                                  type: customFieldType as any,
+                                  required: customFieldRequired,
+                                  enabled: true,
+                                  section: 'custom'
+                                };
+                                setEditingDrive({
+                                  ...editingDrive,
+                                  formFields: [...(editingDrive.formFields || []), newF]
+                                });
+                                setIsAddingCustomField(false);
+                                setCustomFieldLabel('');
+                              }}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg"
+                            >
+                              Confirm Add
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fields List */}
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                      {(editingDrive.formFields || DEFAULT_DRIVE_FORM_FIELDS).map((field, idx) => {
+                        const isEnabled = field.enabled !== false;
+                        return (
+                          <div
+                            key={field.id || idx}
+                            className={`flex items-center justify-between p-2 rounded-lg border text-xs transition-colors ${
+                              isEnabled
+                                ? 'bg-slate-900 border-slate-800 text-white'
+                                : 'bg-slate-950/60 border-slate-800/40 text-slate-500 opacity-60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                              <span className="font-semibold truncate">{field.label}</span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 shrink-0">
+                                {field.type}
+                              </span>
+                              {field.required && (
+                                <span className="text-[9px] font-extrabold text-amber-400 bg-amber-500/10 px-1 rounded border border-amber-500/20 shrink-0">
+                                  Required *
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (editingDrive.formFields || DEFAULT_DRIVE_FORM_FIELDS).map((f, i) =>
+                                    i === idx ? { ...f, required: !f.required } : f
+                                  );
+                                  setEditingDrive({ ...editingDrive, formFields: updated });
+                                }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  field.required
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                {field.required ? 'Mandatory' : 'Optional'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (editingDrive.formFields || DEFAULT_DRIVE_FORM_FIELDS).map((f, i) =>
+                                    i === idx ? { ...f, enabled: !isEnabled } : f
+                                  );
+                                  setEditingDrive({ ...editingDrive, formFields: updated });
+                                }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isEnabled
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                    : 'bg-slate-800 text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                {isEnabled ? 'Active' : 'Disabled'}
+                              </button>
+
+                              {field.section === 'custom' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = (editingDrive.formFields || DEFAULT_DRIVE_FORM_FIELDS).filter((_, i) => i !== idx);
+                                    setEditingDrive({ ...editingDrive, formFields: updated });
+                                  }}
+                                  className="text-red-400 hover:text-red-300 p-0.5"
+                                  title="Remove custom field"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
                 <button
@@ -1185,9 +1688,10 @@ export default function AdminUpcomingDrivesPage({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold shadow-md cursor-pointer"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold shadow-md cursor-pointer flex items-center gap-1.5"
                 >
-                  {isNewDrive ? 'Create Opportunity' : 'Save Drive Details'}
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isNewDrive ? 'Create Opportunity' : 'Save Drive Details'}</span>
                 </button>
               </div>
             </form>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CMSPage,
   GlobalSettings,
@@ -10,6 +10,8 @@ import {
   PlacementDrive,
 } from '../../types';
 import DriveApplicationModal from '../../components/drives/DriveApplicationModal';
+import DriveDetailsModal from '../../components/drives/DriveDetailsModal';
+import { DEFAULT_PLACEMENT_DRIVES_LIST, isDriveExpired, getDriveSlug } from '../../lib/defaultDrives';
 import {
   CheckCircle2,
   ArrowRight,
@@ -38,6 +40,7 @@ interface PublicHomePageProps {
   hiringPartners: HiringPartner[];
   courses: Course[];
   blogs: BlogPost[];
+  drives?: PlacementDrive[];
   onAddLead: (lead: Omit<Lead, 'id' | 'date'>) => void;
   onEditField: (sectionId: string, fieldPath: string, value: any) => void;
 }
@@ -49,15 +52,23 @@ export default function PublicHomePage({
   hiringPartners,
   courses,
   blogs,
+  drives: propDrives,
   onAddLead,
   onEditField,
 }: PublicHomePageProps) {
-  // Placement Drives State
-  const [drives, setDrives] = useState<PlacementDrive[]>([]);
-  const [loadingDrives, setLoadingDrives] = useState(true);
+  const [drives, setDrives] = useState<PlacementDrive[]>(() => {
+    return (propDrives && Array.isArray(propDrives)) ? propDrives : [];
+  });
+  const [loadingDrives, setLoadingDrives] = useState(false);
   const [activeApplyingDrive, setActiveApplyingDrive] = useState<PlacementDrive | null>(null);
   const [detailDrive, setDetailDrive] = useState<PlacementDrive | null>(null);
   const [drivesFilter, setDrivesFilter] = useState<'all' | 'it' | 'core' | 'operations'>('all');
+
+  useEffect(() => {
+    if (propDrives && propDrives.length > 0) {
+      setDrives(propDrives);
+    }
+  }, [propDrives]);
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
@@ -69,7 +80,9 @@ export default function PublicHomePage({
     phone: '',
     email: '',
     degree: 'B.Tech / BE',
-    batch: '2025'
+    batch: '2025',
+    description: '',
+    instruction: ''
   });
   const [freeRegSubmitting, setFreeRegSubmitting] = useState(false);
   const [freeRegSuccess, setFreeRegSuccess] = useState(false);
@@ -88,19 +101,38 @@ export default function PublicHomePage({
     setFreeRegSubmitting(true);
     setFreeRegError(null);
     try {
-      await fetch('/api/leads', {
+      const payload = {
+        name: freeRegForm.name.trim(),
+        phone: freeRegForm.phone.trim(),
+        email: freeRegForm.email.trim(),
+        degree: freeRegForm.degree,
+        batch: freeRegForm.batch,
+        description: freeRegForm.description.trim(),
+        instruction: freeRegForm.instruction.trim(),
+        interest: 'Free Candidate Placement Registration',
+        source: 'Homepage Free Registration Button'
+      };
+
+      // 1. Submit to dedicated free-registrations endpoint
+      await fetch('/api/free-registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: freeRegForm.name,
-          phone: freeRegForm.phone,
-          email: freeRegForm.email,
-          degree: freeRegForm.degree,
-          batch: freeRegForm.batch,
-          interest: 'Free Candidate Placement Registration',
-          source: 'Homepage Free Registration Button'
-        })
+        body: JSON.stringify(payload)
       });
+
+      // 2. Dual save to localStorage for offline access & immediate admin sync
+      try {
+        const localList = JSON.parse(localStorage.getItem('tpx_free_candidate_registrations') || '[]');
+        localList.unshift({
+          id: `fcr-${Date.now()}`,
+          ...payload,
+          status: 'New',
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem('tpx_free_candidate_registrations', JSON.stringify(localList));
+      } catch (errLocal) {
+        // non-blocking
+      }
 
       onAddLead({
         name: freeRegForm.name,
@@ -126,15 +158,13 @@ export default function PublicHomePage({
   const fetchDrives = async () => {
     setLoadingDrives(true);
     try {
-      const res = await fetch('/api/placement-drives');
+      const res = await fetch('/api/placement-drives?activeOnly=true');
       const data = await res.json();
-      if (data.success && Array.isArray(data.drives)) {
+      if (data.success && Array.isArray(data.drives) && data.drives.length > 0) {
         setDrives(data.drives);
-      } else {
-        setDrives([]);
       }
     } catch {
-      setDrives([]);
+      // keep current drives / defaults
     } finally {
       setLoadingDrives(false);
     }
@@ -254,97 +284,33 @@ export default function PublicHomePage({
   const drivesTitle = drivesSection?.title || "Explore Upcoming Placement Drives";
   const drivesSubtitle = drivesSection?.content?.subtitle || "Apply to active corporate drives with zero application charges. Transparent eligibility and direct corporate panels.";
 
-  // Filter drives based on category
-  const filteredDrives = drives.filter(drive => {
-    if (drivesFilter === 'all') return true;
-    const text = `${drive.title} ${drive.skills || ''} ${drive.eligibleDegree || ''}`.toLowerCase();
-    if (drivesFilter === 'it') return text.includes('developer') || text.includes('software') || text.includes('it') || text.includes('tech') || text.includes('cloud') || text.includes('full stack') || text.includes('java');
-    if (drivesFilter === 'core') return text.includes('engineer') || text.includes('trainee') || text.includes('mechanical') || text.includes('civil') || text.includes('electrical') || text.includes('electronics');
-    if (drivesFilter === 'operations') return text.includes('operations') || text.includes('hr') || text.includes('business') || text.includes('analyst') || text.includes('associate');
-    return true;
-  });
+  // 1. Only LIVE / UNEXPIRED drives are shown on the homepage!
+  const liveDrives = useMemo(() => {
+    const list = drives || [];
+    return list.filter(d => !isDriveExpired(d) && d.status === 'published');
+  }, [drives]);
 
-  // Curated Fallback Drives with company logos
-  const fallbackDrives: PlacementDrive[] = [
-    {
-      id: 'fallback-drive-1',
-      companyId: 'comp-infosys',
-      companyName: 'Infosys BPM',
-      companyLogo: 'https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg',
-      title: 'Associate System Engineer',
-      salary: '₹4.20 - ₹5.50 LPA',
-      location: 'Bengaluru / Pune',
-      eligibleDegree: 'B.Tech / BE / MCA',
-      eligibleBatch: '2024 & 2025',
-      selectionProcess: 'Online Test + Tech + HR Round',
-      deadline: '2026-11-30',
-      driveType: 'off-campus',
-      status: 'published',
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'fallback-drive-2',
-      companyId: 'comp-lnt',
-      companyName: 'L&T Technology Services',
-      companyLogo: 'https://upload.wikimedia.org/wikipedia/commons/e/e5/L%26T.png',
-      title: 'Graduate Trainee Engineer',
-      salary: '₹4.80 LPA',
-      location: 'Hyderabad / On-Site',
-      eligibleDegree: 'B.Tech (ECE/CSE/EEE)',
-      eligibleBatch: '2024 & 2025',
-      selectionProcess: 'Cognitive Test + Tech Panel',
-      deadline: '2026-12-05',
-      driveType: 'off-campus',
-      status: 'published',
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'fallback-drive-3',
-      companyId: 'comp-techm',
-      companyName: 'Tech Mahindra',
-      companyLogo: 'https://upload.wikimedia.org/wikipedia/commons/3/34/Tech_Mahindra_New_Logo.svg',
-      title: 'Customer Operations & HR Trainee',
-      salary: '₹3.60 LPA',
-      location: 'Noida / Hybrid',
-      eligibleDegree: 'Any Graduate (B.Com/BBA/B.Tech)',
-      eligibleBatch: '2024 & 2025',
-      selectionProcess: 'Versant English + HR Interview',
-      deadline: '2026-12-10',
-      driveType: 'off-campus',
-      status: 'published',
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'fallback-drive-4',
-      companyId: 'comp-wipro',
-      companyName: 'Wipro Enterprises',
-      companyLogo: 'https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg',
-      title: 'Cloud Support Engineer (AWS / Azure)',
-      salary: '₹5.00 LPA',
-      location: 'Chennai / Remote Flexibility',
-      eligibleDegree: 'BCA / B.Sc (IT) / B.Tech',
-      eligibleBatch: '2024 & 2025',
-      selectionProcess: 'Coding Round + Technical Panel',
-      deadline: '2026-12-15',
-      driveType: 'off-campus',
-      status: 'published',
-      createdAt: new Date().toISOString()
-    }
-  ];
-
-  const rawDisplayedDrives = drives.length > 0 ? filteredDrives : fallbackDrives;
-  
-  // Attach partner logo automatically if missing
-  const displayedDrives = rawDisplayedDrives.slice(0, 6).map(drive => {
-    if (drive.companyLogo) return drive;
-    const partner = hiringPartners.find(
-      p => p.id === drive.companyId || p.name.toLowerCase() === drive.companyName?.toLowerCase()
-    );
-    return {
-      ...drive,
-      companyLogo: partner?.logoUrl || drive.companyLogo
-    };
-  });
+  // 2. Filter live drives based on category tabs
+  const displayedDrives = useMemo(() => {
+    return liveDrives.filter(drive => {
+      if (drivesFilter === 'all') return true;
+      const cat = (drive.category || '').toLowerCase();
+      const text = `${drive.title} ${drive.skills || ''} ${drive.eligibleDegree || ''} ${drive.categoryLabel || ''}`.toLowerCase();
+      if (drivesFilter === 'it') return cat === 'it' || text.includes('developer') || text.includes('software') || text.includes('it') || text.includes('cloud');
+      if (drivesFilter === 'core') return cat === 'core' || text.includes('engineer') || text.includes('trainee') || text.includes('mechanical') || text.includes('electronics');
+      if (drivesFilter === 'operations') return cat === 'product' || text.includes('operations') || text.includes('hr') || text.includes('business') || text.includes('analyst') || text.includes('associate');
+      return true;
+    }).slice(0, 6).map(drive => {
+      if (drive.companyLogo) return drive;
+      const partner = hiringPartners.find(
+        p => p.id === drive.companyId || p.name.toLowerCase() === drive.companyName?.toLowerCase()
+      );
+      return {
+        ...drive,
+        companyLogo: partner?.logoUrl || drive.companyLogo
+      };
+    });
+  }, [liveDrives, drivesFilter, hiringPartners]);
 
   // Hiring Partners data (Live from MongoDB with fallback)
   const defaultHiringPartners: HiringPartner[] = [
@@ -499,12 +465,17 @@ export default function PublicHomePage({
                 <span>Explore Placement Drives</span>
                 <ArrowRight className="w-4 h-4 text-[#092100]" />
               </button>
-              <button
-                onClick={() => setIsFreeRegisterOpen(true)}
+              <a
+                href="#/register-for-free"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.hash = '#/register-for-free';
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white text-slate-900 border border-slate-300 hover:bg-slate-50 hover:border-slate-400 font-bold rounded-lg text-sm transition-colors shadow-xs cursor-pointer"
               >
                 <span>Register for Free</span>
-              </button>
+              </a>
             </div>
           </div>
 
@@ -517,16 +488,7 @@ export default function PublicHomePage({
                 className="w-full h-auto object-cover rounded-2xl max-h-[420px]"
               />
               
-              {/* Top Floating Badge (Clean typography, no green dot) */}
-              <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-xs text-xs">
-                <span className="font-bold text-[#2e6c00] uppercase tracking-wider text-[10px]">
-                  Live Placement Desk Active
-                </span>
-                <span className="text-slate-500 font-medium border-l border-slate-200 pl-2 text-[10px]">
-                  Batch 2024 &amp; 2025
-                </span>
-              </div>
-
+             
               {/* Bottom Floating Card */}
               <div className="absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-sm border border-slate-200 p-3 rounded-xl flex items-center justify-between gap-3 shadow-xs text-xs">
                 <div className="flex items-center gap-2.5">
@@ -680,7 +642,7 @@ export default function PublicHomePage({
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 font-medium">Status:</span>
               <span className="px-3 py-1 bg-[#111111] text-white font-bold rounded-lg text-xs">
-                {drives.length > 0 ? `${drives.length} Active Drives` : 'Verified Corporate Drives'}
+                {liveDrives.length > 0 ? `${liveDrives.length} Active Drives` : 'Verified Corporate Drives'}
               </span>
             </div>
           </div>
@@ -743,7 +705,9 @@ export default function PublicHomePage({
                               {drive.companyName || 'Corporate Partner'}
                             </span>
                             <h3 className="text-sm font-bold text-[#111111] leading-tight truncate mt-0.5">
-                              {drive.title}
+                              <a href={`#/drive/${getDriveSlug(drive)}`} className="hover:text-blue-600 transition-colors">
+                                {drive.title}
+                              </a>
                             </h3>
                           </div>
                         </div>
@@ -787,12 +751,16 @@ export default function PublicHomePage({
                       </span>
 
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setDetailDrive(drive)}
-                          className="px-2.5 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-[11px] text-slate-800 font-bold rounded-lg transition-colors cursor-pointer"
+                        <a
+                          href={`#/drive/${getDriveSlug(drive)}`}
+                          onClick={() => {
+                            window.location.hash = `#/drive/${getDriveSlug(drive)}`;
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="px-2.5 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-[11px] text-slate-800 font-bold rounded-lg transition-colors cursor-pointer inline-block"
                         >
                           Details
-                        </button>
+                        </a>
                         <button
                           onClick={() => setActiveApplyingDrive(drive)}
                           className={`px-3 py-1.5 font-bold rounded-lg text-[11px] transition-all shadow-xs cursor-pointer ${
@@ -1173,12 +1141,17 @@ export default function PublicHomePage({
               <span>Explore Placement Drives</span>
               <ArrowRight className="w-4 h-4 text-[#092100]" />
             </button>
-            <button
-              onClick={() => setIsFreeRegisterOpen(true)}
+            <a
+              href="#/register-for-free"
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.hash = '#/register-for-free';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white border border-slate-700 hover:bg-white/10 font-bold text-sm rounded-lg transition-colors cursor-pointer"
             >
               <span>Register for Free</span>
-            </button>
+            </a>
           </div>
 
           <div className="pt-4 text-slate-400 text-xs flex items-center justify-center gap-4 flex-wrap">
@@ -1203,85 +1176,14 @@ export default function PublicHomePage({
 
       {/* MODAL 2: QUICK DRIVE DETAILS MODAL */}
       {detailDrive && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 sm:p-8 space-y-5 text-left text-xs text-slate-700 my-8">
-            <div className="flex items-start justify-between border-b border-slate-200 pb-3">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#2e6c00] font-mono">
-                  Drive Details
-                </span>
-                <h3 className="text-xl font-bold text-slate-900 font-display">
-                  {detailDrive.title}
-                </h3>
-                <span className="text-xs text-slate-500 font-semibold">{detailDrive.companyName || 'Corporate Partner'}</span>
-              </div>
-              <button
-                onClick={() => setDetailDrive(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-semibold">Compensation (CTC):</span>
-                  <span className="font-bold text-[#2e6c00]">{detailDrive.salary || 'As per Industry Standards'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-semibold">Eligible Degree:</span>
-                  <span className="font-semibold text-slate-800">{detailDrive.eligibleDegree || 'Graduate'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-semibold">Eligible Batch:</span>
-                  <span className="font-semibold text-slate-800">{detailDrive.eligibleBatch || '2024 & 2025'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-semibold">Location:</span>
-                  <span className="font-semibold text-slate-800">{detailDrive.location || 'Pan India'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-semibold">Drive Type:</span>
-                  <span className="font-bold text-slate-800 capitalize">{detailDrive.driveType || 'Off-Campus'}</span>
-                </div>
-              </div>
-
-              {detailDrive.description && (
-                <div>
-                  <span className="font-bold text-slate-900 block mb-1">Job Description &amp; Role Overview:</span>
-                  <p className="text-slate-600 leading-relaxed">{detailDrive.description}</p>
-                </div>
-              )}
-
-              {detailDrive.skills && (
-                <div>
-                  <span className="font-bold text-slate-900 block mb-1">Desired Skills:</span>
-                  <p className="text-slate-600">{detailDrive.skills}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setDetailDrive(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  const target = detailDrive;
-                  setDetailDrive(null);
-                  setActiveApplyingDrive(target);
-                }}
-                className="px-5 py-2 bg-[#80d64b] hover:bg-[#72c242] text-[#092100] font-bold rounded-lg text-xs cursor-pointer"
-              >
-                Apply Now
-              </button>
-            </div>
-          </div>
-        </div>
+        <DriveDetailsModal
+          drive={detailDrive}
+          onClose={() => setDetailDrive(null)}
+          onApply={(d) => {
+            setDetailDrive(null);
+            setActiveApplyingDrive(d);
+          }}
+        />
       )}
 
       {/* MODAL 3: FREE CANDIDATE REGISTRATION MODAL */}
@@ -1330,7 +1232,7 @@ export default function PublicHomePage({
                     onClick={() => {
                       setIsFreeRegisterOpen(false);
                       setFreeRegSuccess(false);
-                      setFreeRegForm({ name: '', phone: '', email: '', degree: 'B.Tech / BE', batch: '2025' });
+                      setFreeRegForm({ name: '', phone: '', email: '', degree: 'B.Tech / BE', batch: '2025', description: '', instruction: '' });
                     }}
                     className="px-6 py-2.5 bg-[#80d64b] hover:bg-[#72c242] text-[#092100] font-bold rounded-lg text-xs cursor-pointer shadow-xs"
                   >
@@ -1424,6 +1326,40 @@ export default function PublicHomePage({
                       <option value="2023 or earlier">2023 or earlier</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Candidate Description / Profile Summary (Optional) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                      Candidate Description / Profile Summary
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium italic">Optional</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={freeRegForm.description}
+                    onChange={(e) => setFreeRegForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="e.g. Full-Stack developer with React/Node.js, interested in software roles..."
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans resize-none"
+                  />
+                </div>
+
+                {/* Candidate Instructions / Preferences (Optional) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                      Special Instructions / Target Roles
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium italic">Optional</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={freeRegForm.instruction}
+                    onChange={(e) => setFreeRegForm(prev => ({ ...prev, instruction: e.target.value }))}
+                    placeholder="e.g. Immediate joiner, preferred location Pune/Bangalore or Remote"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
+                  />
                 </div>
 
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-[#2e6c00] flex items-center gap-2">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CMSPage, CMSSection } from '../../../types';
-import { 
-  FileText, Layout, Settings, Save, MoveUp, MoveDown, Trash2 
+import {
+  FileText, Layout, Settings, Save, MoveUp, MoveDown, Trash2
 } from 'lucide-react';
 
 interface AdminContactPageProps {
@@ -24,23 +24,70 @@ export default function AdminContactPage({
   const [seoDesc, setSeoDesc] = useState(page.seo.description);
   const [seoKeywords, setSeoKeywords] = useState(page.seo.keywords);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const activeSection = page.sections.find(s => s.id === activeSectionId);
 
-  const handleSaveSEO = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPages(prev => prev.map(p => {
-      if (p.id !== page.id) return p;
-      return {
-        ...p,
+  const handleSaveToDatabase = async () => {
+    setIsSaving(true);
+    try {
+      const updatedPage: CMSPage = {
+        ...page,
         seo: {
           title: seoTitle,
           description: seoDesc,
           keywords: seoKeywords
         }
       };
-    }));
-    triggerSaveNotification("SEO Settings updated successfully!");
+
+      const res = await fetch('/api/save-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: updatedPage })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (data.success !== false) {
+        triggerSaveNotification('Contact page saved & synced with MongoDB successfully!');
+      } else {
+        triggerSaveNotification(data.msg || 'Saved locally. Database will sync shortly.');
+      }
+    } catch {
+      triggerSaveNotification('Saved to local storage draft state.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveSEO = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatedPage: CMSPage = {
+      ...page,
+      seo: {
+        title: seoTitle,
+        description: seoDesc,
+        keywords: seoKeywords
+      }
+    };
+    setPages(prev => prev.map(p => (p.id === page.id ? updatedPage : p)));
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/save-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: updatedPage })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success !== false) {
+        triggerSaveNotification("SEO Settings updated & saved to MongoDB!");
+      } else {
+        triggerSaveNotification("SEO Settings updated locally.");
+      }
+    } catch {
+      triggerSaveNotification("SEO Settings updated locally.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const triggerSaveNotification = (msg: string) => {
@@ -53,7 +100,7 @@ export default function AdminContactPage({
   return (
     <div className="w-full bg-slate-900 min-h-screen text-slate-100 p-6 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto flex flex-col gap-8">
-        
+
         {/* Page Title Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div className="flex flex-col">
@@ -68,6 +115,14 @@ export default function AdminContactPage({
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleSaveToDatabase}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              <span>{isSaving ? 'Saving...' : 'Save to Database'}</span>
+            </button>
             <span className="text-[10px] font-mono text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-900 px-2.5 py-1 rounded-md flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-ping" />
               <span>MongoDB Atlas Connected</span>
@@ -84,38 +139,39 @@ export default function AdminContactPage({
           <form onSubmit={handleSaveSEO} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Page Title</label>
-              <input 
-                type="text" 
-                value={seoTitle} 
-                onChange={(e) => setSeoTitle(e.target.value)} 
+              <input
+                type="text"
+                value={seoTitle}
+                onChange={(e) => setSeoTitle(e.target.value)}
                 className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Description</label>
-              <input 
-                type="text" 
-                value={seoDesc} 
-                onChange={(e) => setSeoDesc(e.target.value)} 
+              <input
+                type="text"
+                value={seoDesc}
+                onChange={(e) => setSeoDesc(e.target.value)}
                 className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Keywords</label>
-              <input 
-                type="text" 
-                value={seoKeywords} 
-                onChange={(e) => setSeoKeywords(e.target.value)} 
+              <input
+                type="text"
+                value={seoKeywords}
+                onChange={(e) => setSeoKeywords(e.target.value)}
                 className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
               />
             </div>
             <div className="md:col-span-3 flex justify-end mt-2">
-              <button 
-                type="submit" 
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-colors shadow flex items-center gap-1.5"
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-colors shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <Save className="h-3.5 w-3.5" />
-                <span>Save SEO Metadata</span>
+                <span>{isSaving ? "Saving..." : "Save SEO Metadata"}</span>
               </button>
             </div>
           </form>
@@ -128,13 +184,12 @@ export default function AdminContactPage({
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Page Layout Blocks</h2>
             <div className="flex flex-col gap-2">
               {page.sections.map((section, idx) => (
-                <div 
-                  key={section.id} 
-                  className={`p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
-                    activeSectionId === section.id 
-                      ? 'bg-slate-900 border-blue-500/80 text-white shadow-md' 
-                      : 'bg-slate-950 border-slate-800/80 hover:bg-slate-900 text-slate-400 hover:text-slate-200'
-                  }`}
+                <div
+                  key={section.id}
+                  className={`p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${activeSectionId === section.id
+                    ? 'bg-slate-900 border-blue-500/80 text-white shadow-md'
+                    : 'bg-slate-950 border-slate-800/80 hover:bg-slate-900 text-slate-400 hover:text-slate-200'
+                    }`}
                   onClick={() => setActiveSectionId(section.id)}
                 >
                   <div className="flex flex-col gap-0.5">
@@ -143,7 +198,7 @@ export default function AdminContactPage({
                   </div>
 
                   <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    <button 
+                    <button
                       onClick={() => onMoveSection('up', section.id)}
                       disabled={idx === 0}
                       className="p-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded text-slate-300 transition-colors"
@@ -151,7 +206,7 @@ export default function AdminContactPage({
                     >
                       <MoveUp className="h-3 w-3" />
                     </button>
-                    <button 
+                    <button
                       onClick={() => onMoveSection('down', section.id)}
                       disabled={idx === page.sections.length - 1}
                       className="p-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded text-slate-300 transition-colors"
@@ -175,9 +230,9 @@ export default function AdminContactPage({
                     <h3 className="text-base font-extrabold text-white uppercase mt-1">{activeSection.title || activeSection.type}</h3>
                   </div>
 
-                  <button 
+                  <button
                     onClick={() => {
-                      if(window.confirm("Are you sure you want to delete this block section?")) {
+                      if (window.confirm("Are you sure you want to delete this block section?")) {
                         onDeleteSection(activeSection.id);
                         setActiveSectionId(page.sections[0]?.id || null);
                       }
@@ -194,19 +249,19 @@ export default function AdminContactPage({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Block Display Title</label>
-                      <input 
-                        type="text" 
-                        value={activeSection.title || ''} 
-                        onChange={(e) => onEditField(activeSection.id, 'title', e.target.value)} 
+                      <input
+                        type="text"
+                        value={activeSection.title || ''}
+                        onChange={(e) => onEditField(activeSection.id, 'title', e.target.value)}
                         className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Block Subtitle / Description</label>
-                      <input 
-                        type="text" 
-                        value={activeSection.subtitle || ''} 
-                        onChange={(e) => onEditField(activeSection.id, 'subtitle', e.target.value)} 
+                      <input
+                        type="text"
+                        value={activeSection.subtitle || ''}
+                        onChange={(e) => onEditField(activeSection.id, 'subtitle', e.target.value)}
                         className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                       />
                     </div>
@@ -222,7 +277,7 @@ export default function AdminContactPage({
                             <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">
                               Google Map Link & Global Contacts
                             </h4>
-                            
+
                             <div className="flex flex-col gap-2">
                               <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
                                 Google Map Embed Link (Iframe Src or Raw Link)
@@ -247,7 +302,7 @@ export default function AdminContactPage({
                                 <input
                                   type="text"
                                   value={activeSection.content.phone || ''}
-                                  placeholder="+91 93000 12345"
+                                  placeholder="+91 93023 70048"
                                   onChange={(e) => onEditField(activeSection.id, 'content.phone', e.target.value)}
                                   className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                                 />
@@ -260,7 +315,7 @@ export default function AdminContactPage({
                                 <input
                                   type="text"
                                   value={activeSection.content.email || ''}
-                                  placeholder="info@tantrapex.com"
+                                  placeholder="Contact@tantrapex.com"
                                   onChange={(e) => onEditField(activeSection.id, 'content.email', e.target.value)}
                                   className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                                 />
@@ -289,8 +344,8 @@ export default function AdminContactPage({
 
                             {/* Bhopal & Indore or list */}
                             {(activeSection.content.offices || [
-                              { id: "of-1", name: "Bhopal Office", address: "123, Arera Colony, Bhopal, Madhya Pradesh - 462016" },
-                              { id: "of-2", name: "Indore Office", address: "456, Vijay Nagar, Indore, Madhya Pradesh - 452010" }
+                              { id: "of-1", name: "Indore HQ", address: "3rd Floor, Prestige Vihar, Vijay Nagar, Scheme No 74C, Indore, Madhya Pradesh 452010" },
+                              { id: "of-2", name: "Indore Office", address: "3rd Floor, Prestige Vihar, Vijay Nagar, Scheme No 74C, Indore, Madhya Pradesh 452010" }
                             ]).map((office: any, idx: number) => (
                               <div key={office.id || idx} className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex flex-col gap-3">
                                 <h5 className="text-xs font-black text-slate-200">
@@ -390,16 +445,16 @@ export default function AdminContactPage({
                       ) : (
                         <>
                           <h4 className="text-[10px] font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800/60 pb-1">Block Data Attributes</h4>
-                          
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {Object.entries(activeSection.content).map(([key, val]) => {
                               if (typeof val === 'string') {
                                 return (
                                   <div key={key} className="flex flex-col gap-1.5">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</label>
-                                    <textarea 
-                                      value={val} 
-                                      onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)} 
+                                    <textarea
+                                      value={val}
+                                      onChange={(e) => onEditField(activeSection.id, `content.${key}`, e.target.value)}
                                       className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans min-h-[50px]"
                                     />
                                   </div>
@@ -415,12 +470,13 @@ export default function AdminContactPage({
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-slate-800">
-                  <button 
-                    onClick={() => triggerSaveNotification("Block changes saved to draft MongoDB collections!")}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors shadow flex items-center gap-1.5"
+                  <button
+                    onClick={handleSaveToDatabase}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Save className="h-4 w-4" />
-                    <span>Apply & Save Block</span>
+                    <span>{isSaving ? "Saving to Database..." : "Apply & Save to MongoDB"}</span>
                   </button>
                 </div>
               </div>
